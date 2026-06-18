@@ -131,18 +131,73 @@ PluginSettings {
     function _saveAutoCollapseOnLeave(v) { editAutoCollapseOnLeave = v; _saveGroupMeta() }
     function _saveAutoCollapseSeconds(v) { editAutoCollapseSeconds = v; _saveGroupMeta() }
 
+    // DMS's built-in bar widgets (media controls, power menu, system tray, etc.)
+    // are not PluginService plugins, so they do not appear in availablePluginsList.
+    // Mirror the core widget catalog from DMS WidgetsTab so Widget Group can select
+    // both core DMS widgets and third-party/system plugin widgets.
+    readonly property var coreWidgetTargets: [
+        { id: "workspaceSwitcher", name: "Workspace Switcher", icon: "view_module" },
+        { id: "focusedWindow", name: "Focused Window", icon: "window" },
+        { id: "runningApps", name: "Running Apps", icon: "apps" },
+        { id: "appsDock", name: "Apps Dock", icon: "dock_to_bottom" },
+        { id: "clock", name: "Clock", icon: "schedule" },
+        { id: "weather", name: "Weather Widget", icon: "wb_sunny" },
+        { id: "music", name: "Media Controls", icon: "music_note" },
+        { id: "clipboard", name: "Clipboard Manager", icon: "content_paste" },
+        { id: "cpuUsage", name: "CPU Usage", icon: "memory" },
+        { id: "memUsage", name: "Memory Usage", icon: "developer_board" },
+        { id: "diskUsage", name: "Disk Usage", icon: "storage" },
+        { id: "cpuTemp", name: "CPU Temperature", icon: "device_thermostat" },
+        { id: "gpuTemp", name: "GPU Temperature", icon: "auto_awesome_mosaic" },
+        { id: "systemTray", name: "System Tray", icon: "notifications" },
+        { id: "privacyIndicator", name: "Privacy Indicator", icon: "privacy_tip" },
+        { id: "layout", name: "Layout", icon: "view_quilt" },
+        { id: "controlCenterButton", name: "Control Center", icon: "settings" },
+        { id: "notificationButton", name: "Notification Center", icon: "notifications" },
+        { id: "battery", name: "Battery", icon: "battery_std" },
+        { id: "vpn", name: "VPN", icon: "vpn_lock" },
+        { id: "idleInhibitor", name: "Idle Inhibitor", icon: "motion_sensor_active" },
+        { id: "capsLockIndicator", name: "Caps Lock Indicator", icon: "shift_lock" },
+        { id: "spacer", name: "Spacer", icon: "more_horiz" },
+        { id: "separator", name: "Separator", icon: "remove" },
+        { id: "network_speed_monitor", name: "Network Speed Monitor", icon: "network_check" },
+        { id: "keyboard_layout_name", name: "Keyboard Layout Name", icon: "keyboard" },
+        { id: "notepadButton", name: "Notepad", icon: "assignment" },
+        { id: "colorPicker", name: "Color Picker", icon: "palette" },
+        { id: "systemUpdate", name: "System Update", icon: "update" },
+        { id: "powerMenuButton", name: "Power", icon: "power_settings_new" }
+    ]
+
     readonly property var availableTargets: {
-        if (!pluginService) return []
-        return pluginService.availablePluginsList
+        const targets = coreWidgetTargets.slice()
+        if (!pluginService) return targets
+        return targets.concat(pluginService.availablePluginsList
             .filter(p => p.id !== "widgetGroup"
                       && (p.type === "widget" || (pluginService.pluginWidgetComponents && pluginService.pluginWidgetComponents[p.id])))
-            .map(p => ({ id: p.id, name: p.name }))
+            .map(p => ({ id: p.id, name: p.name, icon: p.icon || "extension" })))
     }
     readonly property var availableTargetNames: availableTargets.map(p => p.name)
 
+    function _targetFor(id) {
+        return availableTargets.find(p => p.id === id) || null
+    }
+
     function _nameFor(id) {
-        const t = availableTargets.find(p => p.id === id)
+        const t = _targetFor(id)
         return t ? t.name : id
+    }
+
+    function _iconFor(id) {
+        const t = _targetFor(id)
+        return t ? (t.icon || "extension") : "extension"
+    }
+
+    function _isCoreTarget(id) {
+        return coreWidgetTargets.some(p => p.id === id)
+    }
+
+    function _isTargetAvailable(id) {
+        return _isCoreTarget(id) || !!(pluginService && pluginService.availablePlugins[id]?.loaded)
     }
 
     // ── Header ─────────────────────────────────────────────────────────────────
@@ -656,8 +711,7 @@ PluginSettings {
                         }
 
                         DankIcon {
-                            name: (pluginService && pluginService.availablePlugins[mid])
-                                ? (pluginService.availablePlugins[mid].icon || "extension") : "extension"
+                            name: root._iconFor(mid)
                             size: Theme.iconSize - 4
                             color: Theme.surfaceText
                             anchors.verticalCenter: parent.verticalCenter
@@ -676,8 +730,8 @@ PluginSettings {
                                 width: parent.width
                             }
                             StyledText {
-                                visible: !(pluginService && pluginService.availablePlugins[mid]?.loaded)
-                                text: "not enabled"
+                                visible: !root._isTargetAvailable(mid)
+                                text: "not available"
                                 font.pixelSize: Theme.fontSizeSmall
                                 color: Theme.error
                             }
