@@ -26,19 +26,32 @@ PluginComponent {
     }
 
     readonly property var targets: variantData?.targets ?? []
+    readonly property string mainTarget: variantData?.mainTarget || ""
     readonly property string groupIcon: variantData?.icon || "widgets"
     readonly property string groupLabel: variantData?.label || ""
     readonly property string groupDisplay: variantData?.display || "both"
     readonly property string expandDir: variantData?.expandDir || "right"
+    readonly property string mainClickButton: variantData?.mainClickButton || "right"
+    readonly property string expandIndicatorPosition: variantData?.expandIndicatorPosition || ""
+    readonly property bool showArrow: variantData?.showArrow !== false
+    readonly property bool showArrowOnlyOnHover: variantData?.showArrowOnlyOnHover === true
+    readonly property bool hideMain: variantData?.hideMain === true
+
+    property var _memberRefs: ({})
 
     readonly property bool showIcon:  groupDisplay !== "text"
     readonly property bool showLabel: groupDisplay !== "icon" && groupLabel !== ""
+    readonly property bool hasToggleContent: showIcon || showLabel
 
     // expandDir is one value covering both orientations: left/right (horizontal
     // bars) and up/down (vertical bars). Each pill uses the relevant pair and
     // falls back to a sane default for the other orientation's values.
     readonly property bool hLeft: expandDir === "left"
     readonly property bool vUp:   expandDir === "up"
+    readonly property bool toggleArrowBeforeContent: {
+        const pos = root._resolvedExpandIndicatorPosition()
+        return pos === "left" || pos === "top"
+    }
 
     // Auto-collapse behaviour
     readonly property bool autoCollapse: variantData?.autoCollapse === true
@@ -49,6 +62,116 @@ PluginComponent {
     readonly property bool autoCollapseOnLeave: variantData?.autoCollapseOnLeave === true
     property bool hovered: false
 
+    function _barPosition() {
+        const edge = root.axis?.edge || "top"
+        return edge === "left" ? 2 : (edge === "right" ? 3 : (edge === "top" ? 0 : 1))
+    }
+
+    function _registerMember(targetId, member) {
+        if (!targetId || !member)
+            return
+        const refs = Object.assign({}, root._memberRefs || {})
+        refs[targetId] = member
+        root._memberRefs = refs
+    }
+
+    function _unregisterMember(targetId, member) {
+        if (!targetId || !member || !root._memberRefs || !root._memberRefs[targetId])
+            return
+        if (root._memberRefs[targetId] !== member)
+            return
+        const refs = Object.assign({}, root._memberRefs)
+        delete refs[targetId]
+        root._memberRefs = refs
+    }
+
+    function _mainMember() {
+        return root.mainTarget ? (root._memberRefs?.[root.mainTarget] || null) : null
+    }
+
+    function _resolvedExpandIndicatorPosition() {
+        if (root.expandIndicatorPosition)
+            return root.expandIndicatorPosition
+        const edge = root.axis?.edge || "top"
+        return (edge === "left" || edge === "right") ? "bottom" : "right"
+    }
+
+    function _shouldShowArrow(hovered) {
+        if (!root.hasToggleContent)
+            return true
+        if (!root.showArrow)
+            return false
+        if (root.showArrowOnlyOnHover)
+            return hovered === true
+        return true
+    }
+
+    function _toggleArrowSlotVisible() {
+        return root.hasToggleContent ? root.showArrow : true
+    }
+
+    function _isMemberHidden(targetId) {
+        return root.hideMain && !!root.mainTarget && targetId === root.mainTarget
+    }
+
+    function _isMemberVisible(targetId) {
+        return !root._isMemberHidden(targetId)
+    }
+
+    function _horizontalToggleSourceComponent() {
+        if (!root._toggleArrowSlotVisible())
+            return hToggleBodyComp
+        const pos = root._resolvedExpandIndicatorPosition()
+        if (pos === "left")
+            return hToggleRowBeforeComp
+        if (pos === "top")
+            return hToggleColumnBeforeComp
+        if (pos === "bottom")
+            return hToggleColumnAfterComp
+        return hToggleRowAfterComp
+    }
+
+    function _verticalToggleSourceComponent() {
+        if (!root._toggleArrowSlotVisible())
+            return vToggleBodyComp
+        const pos = root._resolvedExpandIndicatorPosition()
+        if (pos === "left")
+            return vToggleRowBeforeComp
+        if (pos === "top")
+            return vToggleColumnBeforeComp
+        if (pos === "bottom")
+            return vToggleColumnAfterComp
+        return vToggleRowAfterComp
+    }
+
+    function _handleGroupClick(button) {
+        if (root.mainTarget) {
+            const activateButton = root.mainClickButton === "left" ? Qt.LeftButton : Qt.RightButton
+            if (button === activateButton && root._activateMainMember())
+                return
+        }
+        root.expanded = !root.expanded
+    }
+
+    function _horizontalChevronName() {
+        return root.hLeft
+            ? (root.expanded ? "chevron_right" : "chevron_left")
+            : (root.expanded ? "chevron_left" : "chevron_right")
+    }
+
+    function _verticalChevronName() {
+        return root.vUp
+            ? (root.expanded ? "expand_more" : "expand_less")
+            : (root.expanded ? "expand_less" : "expand_more")
+    }
+
+    function _activateMainMember() {
+        const member = root._mainMember()
+        if (!member || typeof member.triggerMainAction !== "function")
+            return false
+        return member.triggerMainAction()
+    }
+
     Timer {
         id: collapseTimer
         interval: root.autoCollapseSeconds * 1000
@@ -58,6 +181,286 @@ PluginComponent {
         running: root.expanded && root.autoCollapse
                  && (root.autoCollapseOnLeave ? !root.hovered : true)
         onTriggered: root.expanded = false
+    }
+
+    Component {
+        id: hToggleBodyComp
+        Row {
+            spacing: Theme.spacingXS
+            DankIcon {
+                visible: root.showIcon
+                name: root.groupIcon
+                size: root.iconSize
+                color: Theme.surfaceText
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            StyledText {
+                visible: root.showLabel
+                text: root.groupLabel
+                font.pixelSize: Theme.fontSizeMedium
+                font.weight: Font.Medium
+                color: Theme.surfaceText
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
+    }
+
+    Component {
+        id: hToggleArrowComp
+        DankIcon {
+            name: root._horizontalChevronName()
+            size: root.iconSize - 8
+            color: Theme.surfaceVariantText
+            anchors.verticalCenter: parent.verticalCenter
+        }
+    }
+
+    Component {
+        id: hToggleRowBeforeComp
+        Row {
+            spacing: Theme.spacingXS
+            readonly property int slotHeight: Math.max(root.iconSize, hBodyLoader.implicitHeight)
+            Item {
+                width: root.iconSize
+                height: slotHeight
+                Loader {
+                    id: hArrowLoader
+                    anchors.centerIn: parent
+                    sourceComponent: hToggleArrowComp
+                    visible: root._shouldShowArrow(root.hovered)
+                }
+            }
+            Item {
+                width: hBodyLoader.implicitWidth
+                height: slotHeight
+                Loader {
+                    id: hBodyLoader
+                    anchors.centerIn: parent
+                    sourceComponent: hToggleBodyComp
+                }
+            }
+        }
+    }
+
+    Component {
+        id: hToggleRowAfterComp
+        Row {
+            spacing: Theme.spacingXS
+            readonly property int slotHeight: Math.max(root.iconSize, hBodyLoader.implicitHeight)
+            Item {
+                width: root.iconSize
+                height: slotHeight
+                Loader {
+                    id: hArrowLoader
+                    anchors.centerIn: parent
+                    sourceComponent: hToggleArrowComp
+                    visible: root._shouldShowArrow(root.hovered)
+                }
+            }
+            Item {
+                width: hBodyLoader.implicitWidth
+                height: slotHeight
+                Loader {
+                    id: hBodyLoader
+                    anchors.centerIn: parent
+                    sourceComponent: hToggleBodyComp
+                }
+            }
+        }
+    }
+
+    Component {
+        id: hToggleColumnBeforeComp
+        Column {
+            spacing: Theme.spacingXS
+            readonly property int slotWidth: Math.max(root.iconSize, hBodyLoader.implicitWidth)
+            Item {
+                width: slotWidth
+                height: root.iconSize
+                Loader {
+                    id: hArrowLoader
+                    anchors.centerIn: parent
+                    sourceComponent: hToggleArrowComp
+                    visible: root._shouldShowArrow(root.hovered)
+                }
+            }
+            Item {
+                width: slotWidth
+                height: hBodyLoader.implicitHeight
+                Loader {
+                    id: hBodyLoader
+                    anchors.centerIn: parent
+                    sourceComponent: hToggleBodyComp
+                }
+            }
+        }
+    }
+
+    Component {
+        id: hToggleColumnAfterComp
+        Column {
+            spacing: Theme.spacingXS
+            readonly property int slotWidth: Math.max(root.iconSize, hBodyLoader.implicitWidth)
+            Item {
+                width: slotWidth
+                height: hBodyLoader.implicitHeight
+                Loader {
+                    id: hBodyLoader
+                    anchors.centerIn: parent
+                    sourceComponent: hToggleBodyComp
+                }
+            }
+            Item {
+                width: slotWidth
+                height: root.iconSize
+                Loader {
+                    id: hArrowLoader
+                    anchors.centerIn: parent
+                    sourceComponent: hToggleArrowComp
+                    visible: root._shouldShowArrow(root.hovered)
+                }
+            }
+        }
+    }
+
+    Component {
+        id: vToggleBodyComp
+        Column {
+            spacing: 1
+            DankIcon {
+                visible: root.showIcon
+                name: root.groupIcon
+                size: root.iconSize
+                color: Theme.surfaceText
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+            StyledText {
+                visible: root.showLabel
+                text: root.groupLabel
+                font.pixelSize: Theme.fontSizeSmall
+                font.weight: Font.Medium
+                color: Theme.surfaceText
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+        }
+    }
+
+    Component {
+        id: vToggleArrowComp
+        DankIcon {
+            name: root._verticalChevronName()
+            size: root.iconSize - 8
+            color: Theme.surfaceVariantText
+            anchors.horizontalCenter: parent.horizontalCenter
+        }
+    }
+
+    Component {
+        id: vToggleRowBeforeComp
+        Row {
+            spacing: Theme.spacingXS
+            readonly property int slotHeight: Math.max(root.iconSize, vBodyLoader.implicitHeight)
+            Item {
+                width: root.iconSize
+                height: slotHeight
+                Loader {
+                    id: vArrowLoader
+                    anchors.centerIn: parent
+                    sourceComponent: vToggleArrowComp
+                    visible: root._shouldShowArrow(root.hovered)
+                }
+            }
+            Item {
+                width: vBodyLoader.implicitWidth
+                height: slotHeight
+                Loader {
+                    id: vBodyLoader
+                    anchors.centerIn: parent
+                    sourceComponent: vToggleBodyComp
+                }
+            }
+        }
+    }
+
+    Component {
+        id: vToggleRowAfterComp
+        Row {
+            spacing: Theme.spacingXS
+            readonly property int slotHeight: Math.max(root.iconSize, vBodyLoader.implicitHeight)
+            Item {
+                width: root.iconSize
+                height: slotHeight
+                Loader {
+                    id: vArrowLoader
+                    anchors.centerIn: parent
+                    sourceComponent: vToggleArrowComp
+                    visible: root._shouldShowArrow(root.hovered)
+                }
+            }
+            Item {
+                width: vBodyLoader.implicitWidth
+                height: slotHeight
+                Loader {
+                    id: vBodyLoader
+                    anchors.centerIn: parent
+                    sourceComponent: vToggleBodyComp
+                }
+            }
+        }
+    }
+
+    Component {
+        id: vToggleColumnBeforeComp
+        Column {
+            spacing: Theme.spacingXS
+            readonly property int slotWidth: Math.max(root.iconSize, vBodyLoader.implicitWidth)
+            Item {
+                width: slotWidth
+                height: root.iconSize
+                Loader {
+                    id: vArrowLoader
+                    anchors.centerIn: parent
+                    sourceComponent: vToggleArrowComp
+                    visible: root._shouldShowArrow(root.hovered)
+                }
+            }
+            Item {
+                width: slotWidth
+                height: vBodyLoader.implicitHeight
+                Loader {
+                    id: vBodyLoader
+                    anchors.centerIn: parent
+                    sourceComponent: vToggleBodyComp
+                }
+            }
+        }
+    }
+
+    Component {
+        id: vToggleColumnAfterComp
+        Column {
+            spacing: Theme.spacingXS
+            readonly property int slotWidth: Math.max(root.iconSize, vBodyLoader.implicitWidth)
+            Item {
+                width: slotWidth
+                height: vBodyLoader.implicitHeight
+                Loader {
+                    id: vBodyLoader
+                    anchors.centerIn: parent
+                    sourceComponent: vToggleBodyComp
+                }
+            }
+            Item {
+                width: slotWidth
+                height: root.iconSize
+                Loader {
+                    id: vArrowLoader
+                    anchors.centerIn: parent
+                    sourceComponent: vToggleArrowComp
+                    visible: root._shouldShowArrow(root.hovered)
+                }
+            }
+        }
     }
 
     // ── Horizontal bar pill ──────────────────────────────────────────────────
@@ -72,39 +475,15 @@ PluginComponent {
             // Toggle button
             Rectangle {
                 id: hToggle
-                width: hToggleRow.implicitWidth + Theme.spacingS * 2
-                height: hToggleRow.implicitHeight + Theme.spacingXS * 2
+                width: hToggleLoader.implicitWidth + Theme.spacingS * 2
+                height: hToggleLoader.implicitHeight + Theme.spacingXS * 2
                 radius: Theme.cornerRadius
                 color: hToggleArea.containsMouse ? Theme.surfaceContainerHigh : "transparent"
                 anchors.verticalCenter: parent.verticalCenter
-
-                Row {
-                    id: hToggleRow
+                Loader {
+                    id: hToggleLoader
                     anchors.centerIn: parent
-                    spacing: Theme.spacingXS
-                    DankIcon {
-                        visible: root.showIcon
-                        name: root.groupIcon
-                        size: root.iconSize
-                        color: Theme.surfaceText
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                    StyledText {
-                        visible: root.showLabel
-                        text: root.groupLabel
-                        font.pixelSize: Theme.fontSizeMedium
-                        font.weight: Font.Medium
-                        color: Theme.surfaceText
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                    DankIcon {
-                        name: root.hLeft
-                            ? (root.expanded ? "chevron_right" : "chevron_left")
-                            : (root.expanded ? "chevron_left" : "chevron_right")
-                        size: root.iconSize - 8
-                        color: Theme.surfaceVariantText
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
+                    sourceComponent: root._horizontalToggleSourceComponent()
                 }
 
                 MouseArea {
@@ -112,7 +491,10 @@ PluginComponent {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: root.expanded = !root.expanded
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    onClicked: function(mouse) {
+                        root._handleGroupClick(mouse.button)
+                    }
                 }
             }
 
@@ -122,10 +504,11 @@ PluginComponent {
                 delegate: Item {
                     id: hWrap
                     required property var modelData
-                    height: hMember.implicitHeight
-                    width: root.expanded ? hMember.implicitWidth : 0
+                    visible: root._isMemberVisible(hWrap.modelData)
+                    height: root._isMemberVisible(hWrap.modelData) && root.expanded ? hMember.implicitHeight : 0
+                    width: root._isMemberVisible(hWrap.modelData) && root.expanded ? hMember.implicitWidth : 0
                     clip: true
-                    opacity: root.expanded ? 1 : 0
+                    opacity: root._isMemberVisible(hWrap.modelData) && root.expanded ? 1 : 0
                     anchors.verticalCenter: parent.verticalCenter
 
                     Behavior on width   { NumberAnimation { duration: Theme.shortDuration; easing.type: Theme.standardEasing } }
@@ -145,7 +528,14 @@ PluginComponent {
                         barSpacing: root.barSpacing
                         barConfig: root.barConfig
                         blurBarWindow: root.blurBarWindow
+                        onReadyChanged: {
+                            if (ready)
+                                root._registerMember(hWrap.modelData, hMember)
+                        }
                     }
+
+                    Component.onCompleted: root._registerMember(hWrap.modelData, hMember)
+                    Component.onDestruction: root._unregisterMember(hWrap.modelData, hMember)
                 }
             }
 
@@ -153,7 +543,7 @@ PluginComponent {
             // toggle's chevron and pointing back toward it, so the group's extent
             // is clear and symmetric when expanded.
             Item {
-                visible: root.targets.length > 0
+                visible: root.targets.length > 0 && root.targets.some(t => root._isMemberVisible(t))
                 width: root.expanded ? hCapIcon.implicitWidth : 0
                 height: hCapIcon.implicitHeight
                 opacity: root.expanded ? 1 : 0
@@ -183,7 +573,7 @@ PluginComponent {
 
             // Boundary marker at the top — far end when expanding upward
             Item {
-                visible: root.targets.length > 0 && root.vUp
+                visible: root.targets.length > 0 && root.targets.some(t => root._isMemberVisible(t)) && root.vUp
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: vCapTopIcon.implicitWidth
                 height: root.expanded ? vCapTopIcon.implicitHeight : 0
@@ -205,10 +595,11 @@ PluginComponent {
                 delegate: Item {
                     id: vWrap
                     required property var modelData
-                    width: vMember.implicitWidth
-                    height: root.expanded ? vMember.implicitHeight : 0
+                    visible: root._isMemberVisible(vWrap.modelData)
+                    width: root._isMemberVisible(vWrap.modelData) && root.expanded ? vMember.implicitWidth : 0
+                    height: root._isMemberVisible(vWrap.modelData) && root.expanded ? vMember.implicitHeight : 0
                     clip: true
-                    opacity: root.expanded ? 1 : 0
+                    opacity: root._isMemberVisible(vWrap.modelData) && root.expanded ? 1 : 0
                     anchors.horizontalCenter: parent.horizontalCenter
 
                     Behavior on height  { NumberAnimation { duration: Theme.shortDuration; easing.type: Theme.standardEasing } }
@@ -234,7 +625,7 @@ PluginComponent {
 
             // Boundary marker at the bottom — far end when expanding downward
             Item {
-                visible: root.targets.length > 0 && !root.vUp
+                visible: root.targets.length > 0 && root.targets.some(t => root._isMemberVisible(t)) && !root.vUp
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: vCapBotIcon.implicitWidth
                 height: root.expanded ? vCapBotIcon.implicitHeight : 0
@@ -269,39 +660,15 @@ PluginComponent {
 
             Rectangle {
                 id: vToggle
-                width: vToggleCol.implicitWidth + Theme.spacingXS * 2
-                height: vToggleCol.implicitHeight + Theme.spacingS * 2
+                width: vToggleLoader.implicitWidth + Theme.spacingXS * 2
+                height: vToggleLoader.implicitHeight + Theme.spacingS * 2
                 radius: Theme.cornerRadius
                 color: vToggleArea.containsMouse ? Theme.surfaceContainerHigh : "transparent"
                 anchors.horizontalCenter: parent.horizontalCenter
-
-                Column {
-                    id: vToggleCol
+                Loader {
+                    id: vToggleLoader
                     anchors.centerIn: parent
-                    spacing: 1
-                    DankIcon {
-                        visible: root.showIcon
-                        name: root.groupIcon
-                        size: root.iconSize
-                        color: Theme.surfaceText
-                        anchors.horizontalCenter: parent.horizontalCenter
-                    }
-                    StyledText {
-                        visible: root.showLabel
-                        text: root.groupLabel
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.weight: Font.Medium
-                        color: Theme.surfaceText
-                        anchors.horizontalCenter: parent.horizontalCenter
-                    }
-                    DankIcon {
-                        name: root.vUp
-                            ? (root.expanded ? "expand_more" : "expand_less")
-                            : (root.expanded ? "expand_less" : "expand_more")
-                        size: root.iconSize - 8
-                        color: Theme.surfaceVariantText
-                        anchors.horizontalCenter: parent.horizontalCenter
-                    }
+                    sourceComponent: root._verticalToggleSourceComponent()
                 }
 
                 MouseArea {
@@ -309,7 +676,10 @@ PluginComponent {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: root.expanded = !root.expanded
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    onClicked: function(mouse) {
+                        root._handleGroupClick(mouse.button)
+                    }
                 }
             }
 

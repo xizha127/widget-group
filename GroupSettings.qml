@@ -21,6 +21,13 @@ PluginSettings {
     property bool editAutoCollapse: false
     property int editAutoCollapseSeconds: 5
     property bool editAutoCollapseOnLeave: false
+    property string editMainTarget: ""
+    property string editMainClickButton: "right"
+    property string editMainMarkerColor: "primary"
+    property string editExpandIndicatorPosition: ""
+    property bool editShowArrow: true
+    property bool editShowArrowOnlyOnHover: false
+    property bool editHideMain: false
 
     onVariantsChanged: {
         localGroups.clear()
@@ -35,6 +42,13 @@ PluginSettings {
         }
         if (editingGroupId !== "") {
             editingGroup = variants.find(v => v.id === editingGroupId) || null
+            editMainTarget = editingGroup?.mainTarget || ""
+            editMainClickButton = editingGroup?.mainClickButton || "right"
+            editMainMarkerColor = editingGroup?.mainMarkerColor || "primary"
+            editExpandIndicatorPosition = editingGroup?.expandIndicatorPosition || ""
+            editShowArrow = editingGroup?.showArrow !== false
+            editShowArrowOnlyOnHover = editingGroup?.showArrowOnlyOnHover === true
+            editHideMain = editingGroup?.hideMain === true
             _syncMembers()
         }
     }
@@ -72,8 +86,10 @@ PluginSettings {
 
     function _saveMembers(arr) {
         if (!editingGroupId || !pluginService) return
-        updateVariant(editingGroupId, { targets: arr })
-        editingGroup = Object.assign({}, editingGroup, { targets: arr })
+        const mainTarget = arr.includes(editMainTarget) ? editMainTarget : ""
+        editMainTarget = mainTarget
+        updateVariant(editingGroupId, { targets: arr, mainTarget })
+        editingGroup = Object.assign({}, editingGroup, { targets: arr, mainTarget })
         _syncMembers()
         for (let i = 0; i < localGroups.count; i++) {
             if (localGroups.get(i).vid === editingGroupId) {
@@ -94,6 +110,13 @@ PluginSettings {
         editAutoCollapse = v.autoCollapse === true
         editAutoCollapseSeconds = (v.autoCollapseSeconds && v.autoCollapseSeconds >= 1) ? v.autoCollapseSeconds : 5
         editAutoCollapseOnLeave = v.autoCollapseOnLeave === true
+        editMainTarget = v.mainTarget || ""
+        editMainClickButton = v.mainClickButton || "right"
+        editMainMarkerColor = v.mainMarkerColor || "primary"
+        editExpandIndicatorPosition = v.expandIndicatorPosition || ""
+        editShowArrow = v.showArrow !== false
+        editShowArrowOnlyOnHover = v.showArrowOnlyOnHover === true
+        editHideMain = v.hideMain === true
         newMemberId = ""
         editingMemberIndex = -1
         memberPicker.currentValue = ""
@@ -112,7 +135,14 @@ PluginSettings {
             expandDir: editExpandDir,
             autoCollapse: editAutoCollapse,
             autoCollapseSeconds: editAutoCollapseSeconds,
-            autoCollapseOnLeave: editAutoCollapseOnLeave
+            autoCollapseOnLeave: editAutoCollapseOnLeave,
+            mainTarget: editMainTarget || "",
+            mainClickButton: editMainClickButton || "right",
+            mainMarkerColor: editMainMarkerColor || "primary",
+            expandIndicatorPosition: editExpandIndicatorPosition || "",
+            showArrow: editShowArrow !== false,
+            showArrowOnlyOnHover: editShowArrow ? editShowArrowOnlyOnHover === true : false,
+            hideMain: editHideMain === true
         }
         updateVariant(editingGroupId, cfg)
         editingGroup = Object.assign({}, editingGroup, cfg)
@@ -130,19 +160,102 @@ PluginSettings {
     function _saveAutoCollapse(v) { editAutoCollapse = v; _saveGroupMeta() }
     function _saveAutoCollapseOnLeave(v) { editAutoCollapseOnLeave = v; _saveGroupMeta() }
     function _saveAutoCollapseSeconds(v) { editAutoCollapseSeconds = v; _saveGroupMeta() }
+    function _saveMainClickButton(v) { editMainClickButton = v; _saveGroupMeta() }
+    function _saveMainMarkerColor(v) { editMainMarkerColor = v; _saveGroupMeta() }
+    function _saveExpandIndicatorPosition(v) { editExpandIndicatorPosition = v; _saveGroupMeta() }
+    function _saveShowArrow(v) {
+        editShowArrow = v
+        if (!v)
+            editShowArrowOnlyOnHover = false
+        _saveGroupMeta()
+    }
+    function _saveShowArrowOnlyOnHover(v) { editShowArrowOnlyOnHover = v; _saveGroupMeta() }
+    function _saveHideMain(v) { editHideMain = v; _saveGroupMeta() }
+    function _toggleMainTarget(id) {
+        editMainTarget = editMainTarget === id ? "" : id
+        _saveGroupMeta()
+    }
+
+    function _markerPreviewColor(mode) {
+        if (mode === "secondary") return Theme.secondary
+        if (mode === "tertiary") return Theme.tertiary
+        if (mode === "surface") return Theme.surfaceContainerHighest
+        return Theme.primary
+    }
+
+    function _markerPreviewTextColor(mode) {
+        if (mode === "surface") return Theme.surfaceText
+        const c = root._markerPreviewColor(mode)
+        return c.hslLightness > 0.6 ? "#000000" : "#ffffff"
+    }
+
+    // DMS's built-in bar widgets (media controls, power menu, system tray, etc.)
+    // are not PluginService plugins, so they do not appear in availablePluginsList.
+    // Mirror the core widget catalog from DMS WidgetsTab so Widget Group can select
+    // both core DMS widgets and third-party/system plugin widgets.
+    readonly property var coreWidgetTargets: [
+        { id: "workspaceSwitcher", name: "Workspace Switcher", icon: "view_module" },
+        { id: "focusedWindow", name: "Focused Window", icon: "window" },
+        { id: "runningApps", name: "Running Apps", icon: "apps" },
+        { id: "appsDock", name: "Apps Dock", icon: "dock_to_bottom" },
+        { id: "clock", name: "Clock", icon: "schedule" },
+        { id: "weather", name: "Weather Widget", icon: "wb_sunny" },
+        { id: "music", name: "Media Controls", icon: "music_note" },
+        { id: "clipboard", name: "Clipboard Manager", icon: "content_paste" },
+        { id: "cpuUsage", name: "CPU Usage", icon: "memory" },
+        { id: "memUsage", name: "Memory Usage", icon: "developer_board" },
+        { id: "diskUsage", name: "Disk Usage", icon: "storage" },
+        { id: "cpuTemp", name: "CPU Temperature", icon: "device_thermostat" },
+        { id: "gpuTemp", name: "GPU Temperature", icon: "auto_awesome_mosaic" },
+        { id: "systemTray", name: "System Tray", icon: "notifications" },
+        { id: "privacyIndicator", name: "Privacy Indicator", icon: "privacy_tip" },
+        { id: "layout", name: "Layout", icon: "view_quilt" },
+        { id: "controlCenterButton", name: "Control Center", icon: "settings" },
+        { id: "notificationButton", name: "Notification Center", icon: "notifications" },
+        { id: "battery", name: "Battery", icon: "battery_std" },
+        { id: "vpn", name: "VPN", icon: "vpn_lock" },
+        { id: "idleInhibitor", name: "Idle Inhibitor", icon: "motion_sensor_active" },
+        { id: "capsLockIndicator", name: "Caps Lock Indicator", icon: "shift_lock" },
+        { id: "spacer", name: "Spacer", icon: "more_horiz" },
+        { id: "separator", name: "Separator", icon: "remove" },
+        { id: "network_speed_monitor", name: "Network Speed Monitor", icon: "network_check" },
+        { id: "keyboard_layout_name", name: "Keyboard Layout Name", icon: "keyboard" },
+        { id: "notepadButton", name: "Notepad", icon: "assignment" },
+        { id: "colorPicker", name: "Color Picker", icon: "palette" },
+        { id: "systemUpdate", name: "System Update", icon: "update" },
+        { id: "powerMenuButton", name: "Power", icon: "power_settings_new" }
+    ]
 
     readonly property var availableTargets: {
-        if (!pluginService) return []
-        return pluginService.availablePluginsList
+        const targets = coreWidgetTargets.slice()
+        if (!pluginService) return targets
+        return targets.concat(pluginService.availablePluginsList
             .filter(p => p.id !== "widgetGroup"
                       && (p.type === "widget" || (pluginService.pluginWidgetComponents && pluginService.pluginWidgetComponents[p.id])))
-            .map(p => ({ id: p.id, name: p.name }))
+            .map(p => ({ id: p.id, name: p.name, icon: p.icon || "extension" })))
     }
     readonly property var availableTargetNames: availableTargets.map(p => p.name)
 
+    function _targetFor(id) {
+        return availableTargets.find(p => p.id === id) || null
+    }
+
     function _nameFor(id) {
-        const t = availableTargets.find(p => p.id === id)
+        const t = _targetFor(id)
         return t ? t.name : id
+    }
+
+    function _iconFor(id) {
+        const t = _targetFor(id)
+        return t ? (t.icon || "extension") : "extension"
+    }
+
+    function _isCoreTarget(id) {
+        return coreWidgetTargets.some(p => p.id === id)
+    }
+
+    function _isTargetAvailable(id) {
+        return _isCoreTarget(id) || !!(pluginService && pluginService.availablePlugins[id]?.loaded)
     }
 
     // ── Header ─────────────────────────────────────────────────────────────────
@@ -189,7 +302,7 @@ PluginSettings {
 
             StyledText {
                 width: parent.width
-                text: "1. Enable the widget plugins you want to group\n2. Create a group above, then click it to edit (click again to collapse)\n3. Set the button icon, label, and what it shows (icon/text/both)\n4. Choose which way members expand — left/right on horizontal bars, up/down on vertical\n5. Optionally set Auto-collapse to fold the group again after a delay\n6. Add member widgets; click a member to change its plugin, use the arrows to reorder, or ✕ to remove\n7. Go to Bar Settings → Add Widget to place the group on your bar\n\nOn the bar, click the button to show or hide the members. When expanded, a double-chevron marks the far end of the group."
+                text: "1. Enable the widget plugins you want to group\n2. Create a group above, then click it to edit (click again to collapse)\n3. Set the button icon, label, and what it shows (icon/text/both)\n4. Choose which way members expand — left/right on horizontal bars, up/down on vertical\n5. Choose which click should activate the selected main widget, plus the marker color\n6. Optionally pick where the expand arrow appears relative to the button\n7. Optionally set Auto-collapse to fold the group again after a delay\n8. Add member widgets; click a member to change its plugin, use the arrows to reorder, or ✕ to remove\n9. Go to Bar Settings → Add Widget to place the group on your bar\n\nOn the bar, the configured click activates the selected main widget. The other click expands or collapses the group; when no main widget is set, either click expands normally."
                 font.pixelSize: Theme.fontSizeSmall
                 color: Theme.surfaceVariantText
                 wrapMode: Text.WordWrap
@@ -257,7 +370,17 @@ PluginSettings {
                     }
                     const newId = createVariant(root.newGroupName, {
                         icon: root.newGroupIcon || "widgets",
-                        label: "", display: "both", expandDir: "right", targets: []
+                        label: "",
+                        display: "both",
+                        expandDir: "right",
+                        targets: [],
+                        mainTarget: "",
+                        mainClickButton: "right",
+                        mainMarkerColor: "primary",
+                        expandIndicatorPosition: "",
+                        showArrow: true,
+                        showArrowOnlyOnHover: false,
+                        hideMain: false
                     })
                     if (newId) {
                         Qt.callLater(() => pluginService.reloadPlugin("widgetGroup"))
@@ -526,10 +649,122 @@ PluginSettings {
                                 backgroundColor: root.editExpandDir === modelData.value ? Theme.primary : Theme.surfaceContainerHigh
                                 textColor: root.editExpandDir === modelData.value ? Theme.onPrimary : Theme.surfaceText
                                 onClicked: root._saveDir(modelData.value)
-                            }
                         }
                     }
                 }
+            }
+
+            Column {
+                width: parent.width
+                spacing: Theme.spacingXS
+
+                StyledText {
+                    text: "Main widget behavior"
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: "Choose which click activates the selected main widget, what color marks it, and where the expand arrow appears."
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText { text: "Main activation click"; font.pixelSize: Theme.fontSizeSmall; color: Theme.surfaceVariantText }
+                Flow {
+                    width: parent.width
+                    spacing: Theme.spacingS
+                    Repeater {
+                        model: [
+                            { value: "right", label: "Right click" },
+                            { value: "left", label: "Left click" }
+                        ]
+                        delegate: DankButton {
+                            required property var modelData
+                            text: modelData.label
+                            buttonHeight: 32
+                            backgroundColor: root.editMainClickButton === modelData.value ? Theme.primary : Theme.surfaceContainerHigh
+                            textColor: root.editMainClickButton === modelData.value ? Theme.onPrimary : Theme.surfaceText
+                            onClicked: root._saveMainClickButton(modelData.value)
+                        }
+                    }
+                }
+
+                StyledText { text: "Main marker color"; font.pixelSize: Theme.fontSizeSmall; color: Theme.surfaceVariantText }
+                Flow {
+                    width: parent.width
+                    spacing: Theme.spacingS
+                    Repeater {
+                        model: [
+                            { value: "primary", label: "Primary" },
+                            { value: "secondary", label: "Secondary" },
+                            { value: "tertiary", label: "Tertiary" },
+                            { value: "surface", label: "Surface" }
+                        ]
+                        delegate: DankButton {
+                            required property var modelData
+                            text: modelData.label
+                            buttonHeight: 32
+                            backgroundColor: root.editMainMarkerColor === modelData.value
+                                ? root._markerPreviewColor(modelData.value)
+                                : Theme.surfaceContainerHigh
+                            textColor: root.editMainMarkerColor === modelData.value
+                                ? root._markerPreviewTextColor(modelData.value)
+                                : Theme.surfaceText
+                            onClicked: root._saveMainMarkerColor(modelData.value)
+                        }
+                    }
+                }
+
+                StyledText { text: "Expand arrow position"; font.pixelSize: Theme.fontSizeSmall; color: Theme.surfaceVariantText }
+                Flow {
+                    width: parent.width
+                    spacing: Theme.spacingS
+                    Repeater {
+                        model: [
+                            { value: "", label: "Auto" },
+                            { value: "right", label: "Right" },
+                            { value: "left", label: "Left" },
+                            { value: "bottom", label: "Bottom" },
+                            { value: "top", label: "Top" }
+                        ]
+                        delegate: DankButton {
+                            required property var modelData
+                            text: modelData.label
+                            buttonHeight: 32
+                            backgroundColor: root.editExpandIndicatorPosition === modelData.value ? Theme.primary : Theme.surfaceContainerHigh
+                            textColor: root.editExpandIndicatorPosition === modelData.value ? Theme.onPrimary : Theme.surfaceText
+                            onClicked: root._saveExpandIndicatorPosition(modelData.value)
+                        }
+                    }
+                }
+
+                DankToggle {
+                    width: parent.width
+                    text: "Show arrow"
+                    checked: root.editShowArrow
+                    onToggled: (checked) => root._saveShowArrow(checked)
+                }
+
+                DankToggle {
+                    width: parent.width
+                    visible: root.editShowArrow
+                    text: "Show arrow only on hover"
+                    description: "Keep the arrow hidden until the group is hovered. If the group has no icon or text, the arrow stays visible as a fallback."
+                    checked: root.editShowArrowOnlyOnHover
+                    onToggled: (checked) => root._saveShowArrowOnlyOnHover(checked)
+                }
+
+                DankToggle {
+                    width: parent.width
+                    text: "Hide main (if selected)"
+                    description: "Keep the selected main widget out of the expanded member list so it does not appear twice. The main click still activates it."
+                    checked: root.editHideMain
+                    onToggled: (checked) => root._saveHideMain(checked)
+                }
+            }
 
             Rectangle { width: parent.width; height: 1; color: Theme.outlineVariant; opacity: 0.5 }
 
@@ -580,6 +815,14 @@ PluginSettings {
                 font.pixelSize: Theme.fontSizeSmall
                 font.weight: Font.Medium
                 color: Theme.surfaceVariantText
+            }
+
+            StyledText {
+                width: parent.width
+                text: "Use the star on a member to choose the main widget. The configured click runs it; the other click expands or collapses the group."
+                font.pixelSize: Theme.fontSizeSmall
+                color: Theme.surfaceVariantText
+                wrapMode: Text.WordWrap
             }
 
             StyledText {
@@ -656,8 +899,7 @@ PluginSettings {
                         }
 
                         DankIcon {
-                            name: (pluginService && pluginService.availablePlugins[mid])
-                                ? (pluginService.availablePlugins[mid].icon || "extension") : "extension"
+                            name: root._iconFor(mid)
                             size: Theme.iconSize - 4
                             color: Theme.surfaceText
                             anchors.verticalCenter: parent.verticalCenter
@@ -666,7 +908,7 @@ PluginSettings {
                         Column {
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: 2
-                            width: parent.width - 60 - Theme.iconSize - mDel.width - Theme.spacingS * 5
+                            width: parent.width - 60 - Theme.iconSize - mMain.width - mDel.width - Theme.spacingS * 6
 
                             StyledText {
                                 text: root._nameFor(mid)
@@ -676,10 +918,38 @@ PluginSettings {
                                 width: parent.width
                             }
                             StyledText {
-                                visible: !(pluginService && pluginService.availablePlugins[mid]?.loaded)
-                                text: "not enabled"
+                                visible: !root._isTargetAvailable(mid)
+                                text: "not available"
                                 font.pixelSize: Theme.fontSizeSmall
                                 color: Theme.error
+                            }
+                        }
+
+                        Rectangle {
+                            id: mMain
+                            width: 32; height: 32; radius: 16
+                            color: root.editMainTarget === mid
+                                ? root._markerPreviewColor(root.editMainMarkerColor)
+                                : (mainArea.containsMouse ? Theme.surfaceContainerHighest : "transparent")
+                            border.width: root.editMainTarget === mid || mainArea.containsMouse ? 1 : 0
+                            border.color: root.editMainTarget === mid
+                                ? root._markerPreviewColor(root.editMainMarkerColor)
+                                : Theme.outlineVariant
+                            anchors.verticalCenter: parent.verticalCenter
+                            DankIcon {
+                                anchors.centerIn: parent
+                                name: root.editMainTarget === mid ? "star" : "star_outline"
+                                size: 14
+                                color: root.editMainTarget === mid
+                                    ? root._markerPreviewTextColor(root.editMainMarkerColor)
+                                    : (mainArea.containsMouse ? root._markerPreviewColor(root.editMainMarkerColor) : Theme.surfaceVariantText)
+                            }
+                            MouseArea {
+                                id: mainArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root._toggleMainTarget(mid)
                             }
                         }
 
