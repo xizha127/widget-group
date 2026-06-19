@@ -31,6 +31,8 @@ PluginComponent {
     readonly property string groupLabel: variantData?.label || ""
     readonly property string groupDisplay: variantData?.display || "both"
     readonly property string expandDir: variantData?.expandDir || "right"
+    readonly property string mainClickButton: variantData?.mainClickButton || "right"
+    readonly property string expandIndicatorPosition: variantData?.expandIndicatorPosition || ""
 
     property var _memberRefs: ({})
 
@@ -42,6 +44,14 @@ PluginComponent {
     // falls back to a sane default for the other orientation's values.
     readonly property bool hLeft: expandDir === "left"
     readonly property bool vUp:   expandDir === "up"
+    readonly property bool toggleArrowUsesRow: {
+        const pos = root._resolvedExpandIndicatorPosition()
+        return pos === "left" || pos === "right"
+    }
+    readonly property bool toggleArrowBeforeContent: {
+        const pos = root._resolvedExpandIndicatorPosition()
+        return pos === "left" || pos === "top"
+    }
 
     // Auto-collapse behaviour
     readonly property bool autoCollapse: variantData?.autoCollapse === true
@@ -79,17 +89,39 @@ PluginComponent {
         return root.mainTarget ? (root._memberRefs?.[root.mainTarget] || null) : null
     }
 
+    function _resolvedExpandIndicatorPosition() {
+        if (root.expandIndicatorPosition)
+            return root.expandIndicatorPosition
+        const edge = root.axis?.edge || "top"
+        return (edge === "left" || edge === "right") ? "bottom" : "right"
+    }
+
+    function _handleGroupClick(button) {
+        if (root.mainTarget) {
+            const activateButton = root.mainClickButton === "left" ? Qt.LeftButton : Qt.RightButton
+            if (button === activateButton && root._activateMainMember())
+                return
+        }
+        root.expanded = !root.expanded
+    }
+
+    function _horizontalChevronName() {
+        return root.hLeft
+            ? (root.expanded ? "chevron_right" : "chevron_left")
+            : (root.expanded ? "chevron_left" : "chevron_right")
+    }
+
+    function _verticalChevronName() {
+        return root.vUp
+            ? (root.expanded ? "expand_more" : "expand_less")
+            : (root.expanded ? "expand_less" : "expand_more")
+    }
+
     function _activateMainMember() {
         const member = root._mainMember()
         if (!member || typeof member.triggerMainAction !== "function")
             return false
         return member.triggerMainAction()
-    }
-
-    function _handleGroupRightClick() {
-        if (root.mainTarget && root._activateMainMember())
-            return
-        root.expanded = !root.expanded
     }
 
     Timer {
@@ -101,6 +133,142 @@ PluginComponent {
         running: root.expanded && root.autoCollapse
                  && (root.autoCollapseOnLeave ? !root.hovered : true)
         onTriggered: root.expanded = false
+    }
+
+    Component {
+        id: hToggleBodyComp
+        Row {
+            spacing: Theme.spacingXS
+            DankIcon {
+                visible: root.showIcon
+                name: root.groupIcon
+                size: root.iconSize
+                color: Theme.surfaceText
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            StyledText {
+                visible: root.showLabel
+                text: root.groupLabel
+                font.pixelSize: Theme.fontSizeMedium
+                font.weight: Font.Medium
+                color: Theme.surfaceText
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
+    }
+
+    Component {
+        id: hToggleArrowComp
+        DankIcon {
+            name: root._horizontalChevronName()
+            size: root.iconSize - 8
+            color: Theme.surfaceVariantText
+            anchors.verticalCenter: parent.verticalCenter
+        }
+    }
+
+    Component {
+        id: hToggleRowBeforeComp
+        Row {
+            spacing: Theme.spacingXS
+            Loader { sourceComponent: hToggleArrowComp }
+            Loader { sourceComponent: hToggleBodyComp }
+        }
+    }
+
+    Component {
+        id: hToggleRowAfterComp
+        Row {
+            spacing: Theme.spacingXS
+            Loader { sourceComponent: hToggleBodyComp }
+            Loader { sourceComponent: hToggleArrowComp }
+        }
+    }
+
+    Component {
+        id: hToggleColumnBeforeComp
+        Column {
+            spacing: Theme.spacingXS
+            Loader { sourceComponent: hToggleArrowComp }
+            Loader { sourceComponent: hToggleBodyComp }
+        }
+    }
+
+    Component {
+        id: hToggleColumnAfterComp
+        Column {
+            spacing: Theme.spacingXS
+            Loader { sourceComponent: hToggleBodyComp }
+            Loader { sourceComponent: hToggleArrowComp }
+        }
+    }
+
+    Component {
+        id: vToggleBodyComp
+        Column {
+            spacing: 1
+            DankIcon {
+                visible: root.showIcon
+                name: root.groupIcon
+                size: root.iconSize
+                color: Theme.surfaceText
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+            StyledText {
+                visible: root.showLabel
+                text: root.groupLabel
+                font.pixelSize: Theme.fontSizeSmall
+                font.weight: Font.Medium
+                color: Theme.surfaceText
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+        }
+    }
+
+    Component {
+        id: vToggleArrowComp
+        DankIcon {
+            name: root._verticalChevronName()
+            size: root.iconSize - 8
+            color: Theme.surfaceVariantText
+            anchors.horizontalCenter: parent.horizontalCenter
+        }
+    }
+
+    Component {
+        id: vToggleRowBeforeComp
+        Row {
+            spacing: Theme.spacingXS
+            Loader { sourceComponent: vToggleArrowComp }
+            Loader { sourceComponent: vToggleBodyComp }
+        }
+    }
+
+    Component {
+        id: vToggleRowAfterComp
+        Row {
+            spacing: Theme.spacingXS
+            Loader { sourceComponent: vToggleBodyComp }
+            Loader { sourceComponent: vToggleArrowComp }
+        }
+    }
+
+    Component {
+        id: vToggleColumnBeforeComp
+        Column {
+            spacing: Theme.spacingXS
+            Loader { sourceComponent: vToggleArrowComp }
+            Loader { sourceComponent: vToggleBodyComp }
+        }
+    }
+
+    Component {
+        id: vToggleColumnAfterComp
+        Column {
+            spacing: Theme.spacingXS
+            Loader { sourceComponent: vToggleBodyComp }
+            Loader { sourceComponent: vToggleArrowComp }
+        }
     }
 
     // ── Horizontal bar pill ──────────────────────────────────────────────────
@@ -115,39 +283,17 @@ PluginComponent {
             // Toggle button
             Rectangle {
                 id: hToggle
-                width: hToggleRow.implicitWidth + Theme.spacingS * 2
-                height: hToggleRow.implicitHeight + Theme.spacingXS * 2
+                width: hToggleLoader.implicitWidth + Theme.spacingS * 2
+                height: hToggleLoader.implicitHeight + Theme.spacingXS * 2
                 radius: Theme.cornerRadius
                 color: hToggleArea.containsMouse ? Theme.surfaceContainerHigh : "transparent"
                 anchors.verticalCenter: parent.verticalCenter
-
-                Row {
-                    id: hToggleRow
+                Loader {
+                    id: hToggleLoader
                     anchors.centerIn: parent
-                    spacing: Theme.spacingXS
-                    DankIcon {
-                        visible: root.showIcon
-                        name: root.groupIcon
-                        size: root.iconSize
-                        color: Theme.surfaceText
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                    StyledText {
-                        visible: root.showLabel
-                        text: root.groupLabel
-                        font.pixelSize: Theme.fontSizeMedium
-                        font.weight: Font.Medium
-                        color: Theme.surfaceText
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                    DankIcon {
-                        name: root.hLeft
-                            ? (root.expanded ? "chevron_right" : "chevron_left")
-                            : (root.expanded ? "chevron_left" : "chevron_right")
-                        size: root.iconSize - 8
-                        color: Theme.surfaceVariantText
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
+                    sourceComponent: root.toggleArrowUsesRow
+                        ? (root.toggleArrowBeforeContent ? hToggleRowBeforeComp : hToggleRowAfterComp)
+                        : (root.toggleArrowBeforeContent ? hToggleColumnBeforeComp : hToggleColumnAfterComp)
                 }
 
                 MouseArea {
@@ -157,11 +303,7 @@ PluginComponent {
                     cursorShape: Qt.PointingHandCursor
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
                     onClicked: function(mouse) {
-                        if (mouse.button === Qt.RightButton) {
-                            root._handleGroupRightClick()
-                            return
-                        }
-                        root.expanded = !root.expanded
+                        root._handleGroupClick(mouse.button)
                     }
                 }
             }
@@ -326,39 +468,17 @@ PluginComponent {
 
             Rectangle {
                 id: vToggle
-                width: vToggleCol.implicitWidth + Theme.spacingXS * 2
-                height: vToggleCol.implicitHeight + Theme.spacingS * 2
+                width: vToggleLoader.implicitWidth + Theme.spacingXS * 2
+                height: vToggleLoader.implicitHeight + Theme.spacingS * 2
                 radius: Theme.cornerRadius
                 color: vToggleArea.containsMouse ? Theme.surfaceContainerHigh : "transparent"
                 anchors.horizontalCenter: parent.horizontalCenter
-
-                Column {
-                    id: vToggleCol
+                Loader {
+                    id: vToggleLoader
                     anchors.centerIn: parent
-                    spacing: 1
-                    DankIcon {
-                        visible: root.showIcon
-                        name: root.groupIcon
-                        size: root.iconSize
-                        color: Theme.surfaceText
-                        anchors.horizontalCenter: parent.horizontalCenter
-                    }
-                    StyledText {
-                        visible: root.showLabel
-                        text: root.groupLabel
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.weight: Font.Medium
-                        color: Theme.surfaceText
-                        anchors.horizontalCenter: parent.horizontalCenter
-                    }
-                    DankIcon {
-                        name: root.vUp
-                            ? (root.expanded ? "expand_more" : "expand_less")
-                            : (root.expanded ? "expand_less" : "expand_more")
-                        size: root.iconSize - 8
-                        color: Theme.surfaceVariantText
-                        anchors.horizontalCenter: parent.horizontalCenter
-                    }
+                    sourceComponent: root.toggleArrowUsesRow
+                        ? (root.toggleArrowBeforeContent ? vToggleRowBeforeComp : vToggleRowAfterComp)
+                        : (root.toggleArrowBeforeContent ? vToggleColumnBeforeComp : vToggleColumnAfterComp)
                 }
 
                 MouseArea {
@@ -368,11 +488,7 @@ PluginComponent {
                     cursorShape: Qt.PointingHandCursor
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
                     onClicked: function(mouse) {
-                        if (mouse.button === Qt.RightButton) {
-                            root._handleGroupRightClick()
-                            return
-                        }
-                        root.expanded = !root.expanded
+                        root._handleGroupClick(mouse.button)
                     }
                 }
             }

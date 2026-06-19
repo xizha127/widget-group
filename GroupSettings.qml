@@ -22,6 +22,9 @@ PluginSettings {
     property int editAutoCollapseSeconds: 5
     property bool editAutoCollapseOnLeave: false
     property string editMainTarget: ""
+    property string editMainClickButton: "right"
+    property string editMainMarkerColor: "primary"
+    property string editExpandIndicatorPosition: ""
 
     onVariantsChanged: {
         localGroups.clear()
@@ -37,6 +40,9 @@ PluginSettings {
         if (editingGroupId !== "") {
             editingGroup = variants.find(v => v.id === editingGroupId) || null
             editMainTarget = editingGroup?.mainTarget || ""
+            editMainClickButton = editingGroup?.mainClickButton || "right"
+            editMainMarkerColor = editingGroup?.mainMarkerColor || "primary"
+            editExpandIndicatorPosition = editingGroup?.expandIndicatorPosition || ""
             _syncMembers()
         }
     }
@@ -99,6 +105,9 @@ PluginSettings {
         editAutoCollapseSeconds = (v.autoCollapseSeconds && v.autoCollapseSeconds >= 1) ? v.autoCollapseSeconds : 5
         editAutoCollapseOnLeave = v.autoCollapseOnLeave === true
         editMainTarget = v.mainTarget || ""
+        editMainClickButton = v.mainClickButton || "right"
+        editMainMarkerColor = v.mainMarkerColor || "primary"
+        editExpandIndicatorPosition = v.expandIndicatorPosition || ""
         newMemberId = ""
         editingMemberIndex = -1
         memberPicker.currentValue = ""
@@ -118,7 +127,10 @@ PluginSettings {
             autoCollapse: editAutoCollapse,
             autoCollapseSeconds: editAutoCollapseSeconds,
             autoCollapseOnLeave: editAutoCollapseOnLeave,
-            mainTarget: editMainTarget || ""
+            mainTarget: editMainTarget || "",
+            mainClickButton: editMainClickButton || "right",
+            mainMarkerColor: editMainMarkerColor || "primary",
+            expandIndicatorPosition: editExpandIndicatorPosition || ""
         }
         updateVariant(editingGroupId, cfg)
         editingGroup = Object.assign({}, editingGroup, cfg)
@@ -136,9 +148,25 @@ PluginSettings {
     function _saveAutoCollapse(v) { editAutoCollapse = v; _saveGroupMeta() }
     function _saveAutoCollapseOnLeave(v) { editAutoCollapseOnLeave = v; _saveGroupMeta() }
     function _saveAutoCollapseSeconds(v) { editAutoCollapseSeconds = v; _saveGroupMeta() }
+    function _saveMainClickButton(v) { editMainClickButton = v; _saveGroupMeta() }
+    function _saveMainMarkerColor(v) { editMainMarkerColor = v; _saveGroupMeta() }
+    function _saveExpandIndicatorPosition(v) { editExpandIndicatorPosition = v; _saveGroupMeta() }
     function _toggleMainTarget(id) {
         editMainTarget = editMainTarget === id ? "" : id
         _saveGroupMeta()
+    }
+
+    function _markerPreviewColor(mode) {
+        if (mode === "secondary") return Theme.secondary
+        if (mode === "tertiary") return Theme.tertiary
+        if (mode === "surface") return Theme.surfaceContainerHighest
+        return Theme.primary
+    }
+
+    function _markerPreviewTextColor(mode) {
+        if (mode === "surface") return Theme.surfaceText
+        const c = root._markerPreviewColor(mode)
+        return c.hslLightness > 0.6 ? "#000000" : "#ffffff"
     }
 
     // DMS's built-in bar widgets (media controls, power menu, system tray, etc.)
@@ -254,7 +282,7 @@ PluginSettings {
 
             StyledText {
                 width: parent.width
-                text: "1. Enable the widget plugins you want to group\n2. Create a group above, then click it to edit (click again to collapse)\n3. Set the button icon, label, and what it shows (icon/text/both)\n4. Choose which way members expand — left/right on horizontal bars, up/down on vertical\n5. Optionally set Auto-collapse to fold the group again after a delay\n6. Add member widgets; click a member to change its plugin, use the arrows to reorder, or ✕ to remove\n7. Go to Bar Settings → Add Widget to place the group on your bar\n\nOn the bar, click the button to show or hide the members. When expanded, a double-chevron marks the far end of the group."
+                text: "1. Enable the widget plugins you want to group\n2. Create a group above, then click it to edit (click again to collapse)\n3. Set the button icon, label, and what it shows (icon/text/both)\n4. Choose which way members expand — left/right on horizontal bars, up/down on vertical\n5. Choose which click should activate the selected main widget, plus the marker color\n6. Optionally pick where the expand arrow appears relative to the button\n7. Optionally set Auto-collapse to fold the group again after a delay\n8. Add member widgets; click a member to change its plugin, use the arrows to reorder, or ✕ to remove\n9. Go to Bar Settings → Add Widget to place the group on your bar\n\nOn the bar, the configured click activates the selected main widget. The other click expands or collapses the group; when no main widget is set, either click expands normally."
                 font.pixelSize: Theme.fontSizeSmall
                 color: Theme.surfaceVariantText
                 wrapMode: Text.WordWrap
@@ -322,7 +350,14 @@ PluginSettings {
                     }
                     const newId = createVariant(root.newGroupName, {
                         icon: root.newGroupIcon || "widgets",
-                        label: "", display: "both", expandDir: "right", targets: [], mainTarget: ""
+                        label: "",
+                        display: "both",
+                        expandDir: "right",
+                        targets: [],
+                        mainTarget: "",
+                        mainClickButton: "right",
+                        mainMarkerColor: "primary",
+                        expandIndicatorPosition: ""
                     })
                     if (newId) {
                         Qt.callLater(() => pluginService.reloadPlugin("widgetGroup"))
@@ -591,10 +626,98 @@ PluginSettings {
                                 backgroundColor: root.editExpandDir === modelData.value ? Theme.primary : Theme.surfaceContainerHigh
                                 textColor: root.editExpandDir === modelData.value ? Theme.onPrimary : Theme.surfaceText
                                 onClicked: root._saveDir(modelData.value)
-                            }
                         }
                     }
                 }
+            }
+
+            Column {
+                width: parent.width
+                spacing: Theme.spacingXS
+
+                StyledText {
+                    text: "Main widget behavior"
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: "Choose which click activates the selected main widget, what color marks it, and where the expand arrow appears."
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledText { text: "Main activation click"; font.pixelSize: Theme.fontSizeSmall; color: Theme.surfaceVariantText }
+                Flow {
+                    width: parent.width
+                    spacing: Theme.spacingS
+                    Repeater {
+                        model: [
+                            { value: "right", label: "Right click" },
+                            { value: "left", label: "Left click" }
+                        ]
+                        delegate: DankButton {
+                            required property var modelData
+                            text: modelData.label
+                            buttonHeight: 32
+                            backgroundColor: root.editMainClickButton === modelData.value ? Theme.primary : Theme.surfaceContainerHigh
+                            textColor: root.editMainClickButton === modelData.value ? Theme.onPrimary : Theme.surfaceText
+                            onClicked: root._saveMainClickButton(modelData.value)
+                        }
+                    }
+                }
+
+                StyledText { text: "Main marker color"; font.pixelSize: Theme.fontSizeSmall; color: Theme.surfaceVariantText }
+                Flow {
+                    width: parent.width
+                    spacing: Theme.spacingS
+                    Repeater {
+                        model: [
+                            { value: "primary", label: "Primary" },
+                            { value: "secondary", label: "Secondary" },
+                            { value: "tertiary", label: "Tertiary" },
+                            { value: "surface", label: "Surface" }
+                        ]
+                        delegate: DankButton {
+                            required property var modelData
+                            text: modelData.label
+                            buttonHeight: 32
+                            backgroundColor: root.editMainMarkerColor === modelData.value
+                                ? root._markerPreviewColor(modelData.value)
+                                : Theme.surfaceContainerHigh
+                            textColor: root.editMainMarkerColor === modelData.value
+                                ? root._markerPreviewTextColor(modelData.value)
+                                : Theme.surfaceText
+                            onClicked: root._saveMainMarkerColor(modelData.value)
+                        }
+                    }
+                }
+
+                StyledText { text: "Expand arrow position"; font.pixelSize: Theme.fontSizeSmall; color: Theme.surfaceVariantText }
+                Flow {
+                    width: parent.width
+                    spacing: Theme.spacingS
+                    Repeater {
+                        model: [
+                            { value: "", label: "Auto" },
+                            { value: "right", label: "Right" },
+                            { value: "left", label: "Left" },
+                            { value: "bottom", label: "Bottom" },
+                            { value: "top", label: "Top" }
+                        ]
+                        delegate: DankButton {
+                            required property var modelData
+                            text: modelData.label
+                            buttonHeight: 32
+                            backgroundColor: root.editExpandIndicatorPosition === modelData.value ? Theme.primary : Theme.surfaceContainerHigh
+                            textColor: root.editExpandIndicatorPosition === modelData.value ? Theme.onPrimary : Theme.surfaceText
+                            onClicked: root._saveExpandIndicatorPosition(modelData.value)
+                        }
+                    }
+                }
+            }
 
             Rectangle { width: parent.width; height: 1; color: Theme.outlineVariant; opacity: 0.5 }
 
@@ -649,7 +772,7 @@ PluginSettings {
 
             StyledText {
                 width: parent.width
-                text: "Right-clicking the group runs the selected main widget. Use the star on a member to choose it."
+                text: "Use the star on a member to choose the main widget. The configured click runs it; the other click expands or collapses the group."
                 font.pixelSize: Theme.fontSizeSmall
                 color: Theme.surfaceVariantText
                 wrapMode: Text.WordWrap
@@ -758,13 +881,21 @@ PluginSettings {
                         Rectangle {
                             id: mMain
                             width: 32; height: 32; radius: 16
-                            color: mainArea.containsMouse ? Theme.primary : "transparent"
+                            color: root.editMainTarget === mid
+                                ? root._markerPreviewColor(root.editMainMarkerColor)
+                                : (mainArea.containsMouse ? Theme.surfaceContainerHighest : "transparent")
+                            border.width: root.editMainTarget === mid || mainArea.containsMouse ? 1 : 0
+                            border.color: root.editMainTarget === mid
+                                ? root._markerPreviewColor(root.editMainMarkerColor)
+                                : Theme.outlineVariant
                             anchors.verticalCenter: parent.verticalCenter
                             DankIcon {
                                 anchors.centerIn: parent
                                 name: root.editMainTarget === mid ? "star" : "star_outline"
                                 size: 14
-                                color: mainArea.containsMouse || root.editMainTarget === mid ? Theme.onPrimary : Theme.surfaceVariantText
+                                color: root.editMainTarget === mid
+                                    ? root._markerPreviewTextColor(root.editMainMarkerColor)
+                                    : (mainArea.containsMouse ? root._markerPreviewColor(root.editMainMarkerColor) : Theme.surfaceVariantText)
                             }
                             MouseArea {
                                 id: mainArea
