@@ -26,6 +26,7 @@ Item {
     property real barSpacing: 4
     property var barConfig: null
     property var blurBarWindow: null
+    property bool isMain: false
 
     readonly property string _pluginId: targetId.indexOf(":") >= 0 ? targetId.split(":")[0] : targetId
     readonly property string _variantId: targetId.indexOf(":") >= 0 ? targetId.split(":")[1] : ""
@@ -110,6 +111,98 @@ Item {
             gm.popoutService.toggleDankDash(tabIndex, globalPos.x, globalPos.y, item.width, gm.section, gm.parentScreen)
         else if (gm.popoutService.openDankDash)
             gm.popoutService.openDankDash(tabIndex, globalPos.x, globalPos.y, item.width, gm.section, gm.parentScreen)
+    }
+
+    function _popupPosition(anchorItem, sectionOverride) {
+        const effectiveBarConfig = gm.barConfig
+        const barPosition = gm._barPosition()
+        const currentScreen = gm.parentScreen || Screen
+        const globalPos = anchorItem.mapToItem(null, 0, 0)
+        const spacing = effectiveBarConfig?.spacing ?? 4
+        const pos = SettingsData.getPopupTriggerPosition(globalPos, currentScreen, gm.barThickness, anchorItem.width, spacing, barPosition, effectiveBarConfig)
+        return {
+            pos: pos,
+            barPosition: barPosition,
+            screen: currentScreen,
+            section: sectionOverride || gm.section,
+            spacing: spacing,
+            barConfig: effectiveBarConfig
+        }
+    }
+
+    function _requestPopout(loader, anchorItem, kind, sectionOverride) {
+        if (!gm.popoutService || !loader || !anchorItem)
+            return false
+        loader.active = true
+        if (!loader.item)
+            return false
+        const popout = loader.item
+        const state = gm._popupPosition(anchorItem, sectionOverride)
+        if ("triggerScreen" in popout)
+            popout.triggerScreen = state.screen
+        if (popout.setBarContext)
+            popout.setBarContext(state.barPosition, state.barConfig?.bottomGap ?? 0)
+        if (popout.setTriggerPosition)
+            popout.setTriggerPosition(state.pos.x, state.pos.y, state.pos.width, state.section, state.screen, state.barPosition, gm.barThickness, state.spacing, state.barConfig)
+        PopoutManager.requestPopout(popout, undefined, kind)
+        return true
+    }
+
+    function _requestProcessList(sortBy, anchorItem, kind) {
+        if (typeof DgopService !== "undefined" && DgopService.setSortBy)
+            DgopService.setSortBy(sortBy)
+        return gm._requestPopout(gm.popoutService.processListPopoutLoader, anchorItem, kind, "right")
+    }
+
+    function triggerMainAction() {
+        const item = loader.item
+        if (!item)
+            return false
+
+        switch (gm._pluginId) {
+        case "controlCenterButton":
+            return gm._requestPopout(gm.popoutService.controlCenterLoader, item, "controlCenter", "right")
+        case "notificationButton":
+            return gm._requestPopout(gm.popoutService.notificationCenterLoader, item, "notifications", "right")
+        case "battery":
+            return gm._requestPopout(gm.popoutService.batteryPopoutLoader, item, "battery", "right")
+        case "vpn":
+            return gm._requestPopout(gm.popoutService.vpnPopoutLoader, item, "vpn", "right")
+        case "systemUpdate":
+            return gm._requestPopout(gm.popoutService.systemUpdateLoader, item, "systemUpdate", "right")
+        case "layout":
+            return gm._requestPopout(gm.popoutService.layoutPopoutLoader, item, "layout", "center")
+        case "clipboard":
+            if (gm.popoutService.openClipboardHistory) {
+                gm.popoutService.openClipboardHistory()
+                return true
+            }
+            return false
+        case "cpuUsage":
+            return gm._requestProcessList("cpu", item, "cpu")
+        case "memUsage":
+            return gm._requestProcessList("memory", item, "memory")
+        case "cpuTemp":
+            return gm._requestProcessList("cpu", item, "cpu_temp")
+        case "gpuTemp":
+            return gm._requestProcessList("cpu", item, "gpu_temp")
+        case "systemTray":
+            if ("menuOpen" in item) {
+                item.menuOpen = !item.menuOpen
+                return true
+            }
+            break
+        }
+
+        if (typeof item.clicked === "function") {
+            item.clicked()
+            return true
+        }
+        if (typeof item.triggerPopout === "function") {
+            item.triggerPopout()
+            return true
+        }
+        return false
     }
 
     Loader {

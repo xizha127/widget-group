@@ -26,10 +26,13 @@ PluginComponent {
     }
 
     readonly property var targets: variantData?.targets ?? []
+    readonly property string mainTarget: variantData?.mainTarget || ""
     readonly property string groupIcon: variantData?.icon || "widgets"
     readonly property string groupLabel: variantData?.label || ""
     readonly property string groupDisplay: variantData?.display || "both"
     readonly property string expandDir: variantData?.expandDir || "right"
+
+    property var _memberRefs: ({})
 
     readonly property bool showIcon:  groupDisplay !== "text"
     readonly property bool showLabel: groupDisplay !== "icon" && groupLabel !== ""
@@ -48,6 +51,46 @@ PluginComponent {
     }
     readonly property bool autoCollapseOnLeave: variantData?.autoCollapseOnLeave === true
     property bool hovered: false
+
+    function _barPosition() {
+        const edge = root.axis?.edge || "top"
+        return edge === "left" ? 2 : (edge === "right" ? 3 : (edge === "top" ? 0 : 1))
+    }
+
+    function _registerMember(targetId, member) {
+        if (!targetId || !member)
+            return
+        const refs = Object.assign({}, root._memberRefs || {})
+        refs[targetId] = member
+        root._memberRefs = refs
+    }
+
+    function _unregisterMember(targetId, member) {
+        if (!targetId || !member || !root._memberRefs || !root._memberRefs[targetId])
+            return
+        if (root._memberRefs[targetId] !== member)
+            return
+        const refs = Object.assign({}, root._memberRefs)
+        delete refs[targetId]
+        root._memberRefs = refs
+    }
+
+    function _mainMember() {
+        return root.mainTarget ? (root._memberRefs?.[root.mainTarget] || null) : null
+    }
+
+    function _activateMainMember() {
+        const member = root._mainMember()
+        if (!member || typeof member.triggerMainAction !== "function")
+            return false
+        return member.triggerMainAction()
+    }
+
+    function _handleGroupRightClick() {
+        if (root.mainTarget && root._activateMainMember())
+            return
+        root.expanded = !root.expanded
+    }
 
     Timer {
         id: collapseTimer
@@ -112,7 +155,14 @@ PluginComponent {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: root.expanded = !root.expanded
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    onClicked: function(mouse) {
+                        if (mouse.button === Qt.RightButton) {
+                            root._handleGroupRightClick()
+                            return
+                        }
+                        root.expanded = !root.expanded
+                    }
                 }
             }
 
@@ -145,7 +195,14 @@ PluginComponent {
                         barSpacing: root.barSpacing
                         barConfig: root.barConfig
                         blurBarWindow: root.blurBarWindow
+                        onReadyChanged: {
+                            if (ready)
+                                root._registerMember(hWrap.modelData, hMember)
+                        }
                     }
+
+                    Component.onCompleted: root._registerMember(hWrap.modelData, hMember)
+                    Component.onDestruction: root._unregisterMember(hWrap.modelData, hMember)
                 }
             }
 
@@ -309,7 +366,14 @@ PluginComponent {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: root.expanded = !root.expanded
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    onClicked: function(mouse) {
+                        if (mouse.button === Qt.RightButton) {
+                            root._handleGroupRightClick()
+                            return
+                        }
+                        root.expanded = !root.expanded
+                    }
                 }
             }
 

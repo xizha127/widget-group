@@ -21,6 +21,7 @@ PluginSettings {
     property bool editAutoCollapse: false
     property int editAutoCollapseSeconds: 5
     property bool editAutoCollapseOnLeave: false
+    property string editMainTarget: ""
 
     onVariantsChanged: {
         localGroups.clear()
@@ -35,6 +36,7 @@ PluginSettings {
         }
         if (editingGroupId !== "") {
             editingGroup = variants.find(v => v.id === editingGroupId) || null
+            editMainTarget = editingGroup?.mainTarget || ""
             _syncMembers()
         }
     }
@@ -72,8 +74,10 @@ PluginSettings {
 
     function _saveMembers(arr) {
         if (!editingGroupId || !pluginService) return
-        updateVariant(editingGroupId, { targets: arr })
-        editingGroup = Object.assign({}, editingGroup, { targets: arr })
+        const mainTarget = arr.includes(editMainTarget) ? editMainTarget : ""
+        editMainTarget = mainTarget
+        updateVariant(editingGroupId, { targets: arr, mainTarget })
+        editingGroup = Object.assign({}, editingGroup, { targets: arr, mainTarget })
         _syncMembers()
         for (let i = 0; i < localGroups.count; i++) {
             if (localGroups.get(i).vid === editingGroupId) {
@@ -94,6 +98,7 @@ PluginSettings {
         editAutoCollapse = v.autoCollapse === true
         editAutoCollapseSeconds = (v.autoCollapseSeconds && v.autoCollapseSeconds >= 1) ? v.autoCollapseSeconds : 5
         editAutoCollapseOnLeave = v.autoCollapseOnLeave === true
+        editMainTarget = v.mainTarget || ""
         newMemberId = ""
         editingMemberIndex = -1
         memberPicker.currentValue = ""
@@ -112,7 +117,8 @@ PluginSettings {
             expandDir: editExpandDir,
             autoCollapse: editAutoCollapse,
             autoCollapseSeconds: editAutoCollapseSeconds,
-            autoCollapseOnLeave: editAutoCollapseOnLeave
+            autoCollapseOnLeave: editAutoCollapseOnLeave,
+            mainTarget: editMainTarget || ""
         }
         updateVariant(editingGroupId, cfg)
         editingGroup = Object.assign({}, editingGroup, cfg)
@@ -130,6 +136,10 @@ PluginSettings {
     function _saveAutoCollapse(v) { editAutoCollapse = v; _saveGroupMeta() }
     function _saveAutoCollapseOnLeave(v) { editAutoCollapseOnLeave = v; _saveGroupMeta() }
     function _saveAutoCollapseSeconds(v) { editAutoCollapseSeconds = v; _saveGroupMeta() }
+    function _toggleMainTarget(id) {
+        editMainTarget = editMainTarget === id ? "" : id
+        _saveGroupMeta()
+    }
 
     // DMS's built-in bar widgets (media controls, power menu, system tray, etc.)
     // are not PluginService plugins, so they do not appear in availablePluginsList.
@@ -312,7 +322,7 @@ PluginSettings {
                     }
                     const newId = createVariant(root.newGroupName, {
                         icon: root.newGroupIcon || "widgets",
-                        label: "", display: "both", expandDir: "right", targets: []
+                        label: "", display: "both", expandDir: "right", targets: [], mainTarget: ""
                     })
                     if (newId) {
                         Qt.callLater(() => pluginService.reloadPlugin("widgetGroup"))
@@ -638,6 +648,14 @@ PluginSettings {
             }
 
             StyledText {
+                width: parent.width
+                text: "Right-clicking the group runs the selected main widget. Use the star on a member to choose it."
+                font.pixelSize: Theme.fontSizeSmall
+                color: Theme.surfaceVariantText
+                wrapMode: Text.WordWrap
+            }
+
+            StyledText {
                 visible: localMembers.count === 0
                 text: "No widgets yet. Add some below."
                 font.pixelSize: Theme.fontSizeSmall
@@ -720,7 +738,7 @@ PluginSettings {
                         Column {
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: 2
-                            width: parent.width - 60 - Theme.iconSize - mDel.width - Theme.spacingS * 5
+                            width: parent.width - 60 - Theme.iconSize - mMain.width - mDel.width - Theme.spacingS * 6
 
                             StyledText {
                                 text: root._nameFor(mid)
@@ -734,6 +752,26 @@ PluginSettings {
                                 text: "not available"
                                 font.pixelSize: Theme.fontSizeSmall
                                 color: Theme.error
+                            }
+                        }
+
+                        Rectangle {
+                            id: mMain
+                            width: 32; height: 32; radius: 16
+                            color: mainArea.containsMouse ? Theme.primary : "transparent"
+                            anchors.verticalCenter: parent.verticalCenter
+                            DankIcon {
+                                anchors.centerIn: parent
+                                name: root.editMainTarget === mid ? "star" : "star_outline"
+                                size: 14
+                                color: mainArea.containsMouse || root.editMainTarget === mid ? Theme.onPrimary : Theme.surfaceVariantText
+                            }
+                            MouseArea {
+                                id: mainArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root._toggleMainTarget(mid)
                             }
                         }
 
