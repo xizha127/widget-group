@@ -33,21 +33,21 @@ PluginComponent {
     readonly property string expandDir: variantData?.expandDir || "right"
     readonly property string mainClickButton: variantData?.mainClickButton || "right"
     readonly property string expandIndicatorPosition: variantData?.expandIndicatorPosition || ""
+    readonly property bool showArrow: variantData?.showArrow !== false
+    readonly property bool showArrowOnlyOnHover: variantData?.showArrowOnlyOnHover === true
+    readonly property bool hideMain: variantData?.hideMain === true
 
     property var _memberRefs: ({})
 
     readonly property bool showIcon:  groupDisplay !== "text"
     readonly property bool showLabel: groupDisplay !== "icon" && groupLabel !== ""
+    readonly property bool hasToggleContent: showIcon || showLabel
 
     // expandDir is one value covering both orientations: left/right (horizontal
     // bars) and up/down (vertical bars). Each pill uses the relevant pair and
     // falls back to a sane default for the other orientation's values.
     readonly property bool hLeft: expandDir === "left"
     readonly property bool vUp:   expandDir === "up"
-    readonly property bool toggleArrowUsesRow: {
-        const pos = root._resolvedExpandIndicatorPosition()
-        return pos === "left" || pos === "right"
-    }
     readonly property bool toggleArrowBeforeContent: {
         const pos = root._resolvedExpandIndicatorPosition()
         return pos === "left" || pos === "top"
@@ -94,6 +94,54 @@ PluginComponent {
             return root.expandIndicatorPosition
         const edge = root.axis?.edge || "top"
         return (edge === "left" || edge === "right") ? "bottom" : "right"
+    }
+
+    function _shouldShowArrow(hovered) {
+        if (!root.hasToggleContent)
+            return true
+        if (!root.showArrow)
+            return false
+        if (root.showArrowOnlyOnHover)
+            return hovered === true
+        return true
+    }
+
+    function _toggleArrowSlotVisible() {
+        return root.hasToggleContent ? root.showArrow : true
+    }
+
+    function _isMemberHidden(targetId) {
+        return root.hideMain && !!root.mainTarget && targetId === root.mainTarget
+    }
+
+    function _isMemberVisible(targetId) {
+        return !root._isMemberHidden(targetId)
+    }
+
+    function _horizontalToggleSourceComponent() {
+        if (!root._toggleArrowSlotVisible())
+            return hToggleBodyComp
+        const pos = root._resolvedExpandIndicatorPosition()
+        if (pos === "left")
+            return hToggleRowBeforeComp
+        if (pos === "top")
+            return hToggleColumnBeforeComp
+        if (pos === "bottom")
+            return hToggleColumnAfterComp
+        return hToggleRowAfterComp
+    }
+
+    function _verticalToggleSourceComponent() {
+        if (!root._toggleArrowSlotVisible())
+            return vToggleBodyComp
+        const pos = root._resolvedExpandIndicatorPosition()
+        if (pos === "left")
+            return vToggleRowBeforeComp
+        if (pos === "top")
+            return vToggleColumnBeforeComp
+        if (pos === "bottom")
+            return vToggleColumnAfterComp
+        return vToggleRowAfterComp
     }
 
     function _handleGroupClick(button) {
@@ -171,8 +219,26 @@ PluginComponent {
         id: hToggleRowBeforeComp
         Row {
             spacing: Theme.spacingXS
-            Loader { sourceComponent: hToggleArrowComp }
-            Loader { sourceComponent: hToggleBodyComp }
+            readonly property int slotHeight: Math.max(root.iconSize, hBodyLoader.implicitHeight)
+            Item {
+                width: root.iconSize
+                height: slotHeight
+                Loader {
+                    id: hArrowLoader
+                    anchors.centerIn: parent
+                    sourceComponent: hToggleArrowComp
+                    visible: root._shouldShowArrow(root.hovered)
+                }
+            }
+            Item {
+                width: hBodyLoader.implicitWidth
+                height: slotHeight
+                Loader {
+                    id: hBodyLoader
+                    anchors.centerIn: parent
+                    sourceComponent: hToggleBodyComp
+                }
+            }
         }
     }
 
@@ -180,8 +246,26 @@ PluginComponent {
         id: hToggleRowAfterComp
         Row {
             spacing: Theme.spacingXS
-            Loader { sourceComponent: hToggleBodyComp }
-            Loader { sourceComponent: hToggleArrowComp }
+            readonly property int slotHeight: Math.max(root.iconSize, hBodyLoader.implicitHeight)
+            Item {
+                width: root.iconSize
+                height: slotHeight
+                Loader {
+                    id: hArrowLoader
+                    anchors.centerIn: parent
+                    sourceComponent: hToggleArrowComp
+                    visible: root._shouldShowArrow(root.hovered)
+                }
+            }
+            Item {
+                width: hBodyLoader.implicitWidth
+                height: slotHeight
+                Loader {
+                    id: hBodyLoader
+                    anchors.centerIn: parent
+                    sourceComponent: hToggleBodyComp
+                }
+            }
         }
     }
 
@@ -189,8 +273,26 @@ PluginComponent {
         id: hToggleColumnBeforeComp
         Column {
             spacing: Theme.spacingXS
-            Loader { sourceComponent: hToggleArrowComp }
-            Loader { sourceComponent: hToggleBodyComp }
+            readonly property int slotWidth: Math.max(root.iconSize, hBodyLoader.implicitWidth)
+            Item {
+                width: slotWidth
+                height: root.iconSize
+                Loader {
+                    id: hArrowLoader
+                    anchors.centerIn: parent
+                    sourceComponent: hToggleArrowComp
+                    visible: root._shouldShowArrow(root.hovered)
+                }
+            }
+            Item {
+                width: slotWidth
+                height: hBodyLoader.implicitHeight
+                Loader {
+                    id: hBodyLoader
+                    anchors.centerIn: parent
+                    sourceComponent: hToggleBodyComp
+                }
+            }
         }
     }
 
@@ -198,8 +300,26 @@ PluginComponent {
         id: hToggleColumnAfterComp
         Column {
             spacing: Theme.spacingXS
-            Loader { sourceComponent: hToggleBodyComp }
-            Loader { sourceComponent: hToggleArrowComp }
+            readonly property int slotWidth: Math.max(root.iconSize, hBodyLoader.implicitWidth)
+            Item {
+                width: slotWidth
+                height: hBodyLoader.implicitHeight
+                Loader {
+                    id: hBodyLoader
+                    anchors.centerIn: parent
+                    sourceComponent: hToggleBodyComp
+                }
+            }
+            Item {
+                width: slotWidth
+                height: root.iconSize
+                Loader {
+                    id: hArrowLoader
+                    anchors.centerIn: parent
+                    sourceComponent: hToggleArrowComp
+                    visible: root._shouldShowArrow(root.hovered)
+                }
+            }
         }
     }
 
@@ -239,8 +359,26 @@ PluginComponent {
         id: vToggleRowBeforeComp
         Row {
             spacing: Theme.spacingXS
-            Loader { sourceComponent: vToggleArrowComp }
-            Loader { sourceComponent: vToggleBodyComp }
+            readonly property int slotHeight: Math.max(root.iconSize, vBodyLoader.implicitHeight)
+            Item {
+                width: root.iconSize
+                height: slotHeight
+                Loader {
+                    id: vArrowLoader
+                    anchors.centerIn: parent
+                    sourceComponent: vToggleArrowComp
+                    visible: root._shouldShowArrow(root.hovered)
+                }
+            }
+            Item {
+                width: vBodyLoader.implicitWidth
+                height: slotHeight
+                Loader {
+                    id: vBodyLoader
+                    anchors.centerIn: parent
+                    sourceComponent: vToggleBodyComp
+                }
+            }
         }
     }
 
@@ -248,8 +386,26 @@ PluginComponent {
         id: vToggleRowAfterComp
         Row {
             spacing: Theme.spacingXS
-            Loader { sourceComponent: vToggleBodyComp }
-            Loader { sourceComponent: vToggleArrowComp }
+            readonly property int slotHeight: Math.max(root.iconSize, vBodyLoader.implicitHeight)
+            Item {
+                width: root.iconSize
+                height: slotHeight
+                Loader {
+                    id: vArrowLoader
+                    anchors.centerIn: parent
+                    sourceComponent: vToggleArrowComp
+                    visible: root._shouldShowArrow(root.hovered)
+                }
+            }
+            Item {
+                width: vBodyLoader.implicitWidth
+                height: slotHeight
+                Loader {
+                    id: vBodyLoader
+                    anchors.centerIn: parent
+                    sourceComponent: vToggleBodyComp
+                }
+            }
         }
     }
 
@@ -257,8 +413,26 @@ PluginComponent {
         id: vToggleColumnBeforeComp
         Column {
             spacing: Theme.spacingXS
-            Loader { sourceComponent: vToggleArrowComp }
-            Loader { sourceComponent: vToggleBodyComp }
+            readonly property int slotWidth: Math.max(root.iconSize, vBodyLoader.implicitWidth)
+            Item {
+                width: slotWidth
+                height: root.iconSize
+                Loader {
+                    id: vArrowLoader
+                    anchors.centerIn: parent
+                    sourceComponent: vToggleArrowComp
+                    visible: root._shouldShowArrow(root.hovered)
+                }
+            }
+            Item {
+                width: slotWidth
+                height: vBodyLoader.implicitHeight
+                Loader {
+                    id: vBodyLoader
+                    anchors.centerIn: parent
+                    sourceComponent: vToggleBodyComp
+                }
+            }
         }
     }
 
@@ -266,8 +440,26 @@ PluginComponent {
         id: vToggleColumnAfterComp
         Column {
             spacing: Theme.spacingXS
-            Loader { sourceComponent: vToggleBodyComp }
-            Loader { sourceComponent: vToggleArrowComp }
+            readonly property int slotWidth: Math.max(root.iconSize, vBodyLoader.implicitWidth)
+            Item {
+                width: slotWidth
+                height: vBodyLoader.implicitHeight
+                Loader {
+                    id: vBodyLoader
+                    anchors.centerIn: parent
+                    sourceComponent: vToggleBodyComp
+                }
+            }
+            Item {
+                width: slotWidth
+                height: root.iconSize
+                Loader {
+                    id: vArrowLoader
+                    anchors.centerIn: parent
+                    sourceComponent: vToggleArrowComp
+                    visible: root._shouldShowArrow(root.hovered)
+                }
+            }
         }
     }
 
@@ -291,9 +483,7 @@ PluginComponent {
                 Loader {
                     id: hToggleLoader
                     anchors.centerIn: parent
-                    sourceComponent: root.toggleArrowUsesRow
-                        ? (root.toggleArrowBeforeContent ? hToggleRowBeforeComp : hToggleRowAfterComp)
-                        : (root.toggleArrowBeforeContent ? hToggleColumnBeforeComp : hToggleColumnAfterComp)
+                    sourceComponent: root._horizontalToggleSourceComponent()
                 }
 
                 MouseArea {
@@ -314,10 +504,11 @@ PluginComponent {
                 delegate: Item {
                     id: hWrap
                     required property var modelData
-                    height: hMember.implicitHeight
-                    width: root.expanded ? hMember.implicitWidth : 0
+                    visible: root._isMemberVisible(hWrap.modelData)
+                    height: root._isMemberVisible(hWrap.modelData) && root.expanded ? hMember.implicitHeight : 0
+                    width: root._isMemberVisible(hWrap.modelData) && root.expanded ? hMember.implicitWidth : 0
                     clip: true
-                    opacity: root.expanded ? 1 : 0
+                    opacity: root._isMemberVisible(hWrap.modelData) && root.expanded ? 1 : 0
                     anchors.verticalCenter: parent.verticalCenter
 
                     Behavior on width   { NumberAnimation { duration: Theme.shortDuration; easing.type: Theme.standardEasing } }
@@ -352,7 +543,7 @@ PluginComponent {
             // toggle's chevron and pointing back toward it, so the group's extent
             // is clear and symmetric when expanded.
             Item {
-                visible: root.targets.length > 0
+                visible: root.targets.length > 0 && root.targets.some(t => root._isMemberVisible(t))
                 width: root.expanded ? hCapIcon.implicitWidth : 0
                 height: hCapIcon.implicitHeight
                 opacity: root.expanded ? 1 : 0
@@ -382,7 +573,7 @@ PluginComponent {
 
             // Boundary marker at the top — far end when expanding upward
             Item {
-                visible: root.targets.length > 0 && root.vUp
+                visible: root.targets.length > 0 && root.targets.some(t => root._isMemberVisible(t)) && root.vUp
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: vCapTopIcon.implicitWidth
                 height: root.expanded ? vCapTopIcon.implicitHeight : 0
@@ -404,10 +595,11 @@ PluginComponent {
                 delegate: Item {
                     id: vWrap
                     required property var modelData
-                    width: vMember.implicitWidth
-                    height: root.expanded ? vMember.implicitHeight : 0
+                    visible: root._isMemberVisible(vWrap.modelData)
+                    width: root._isMemberVisible(vWrap.modelData) && root.expanded ? vMember.implicitWidth : 0
+                    height: root._isMemberVisible(vWrap.modelData) && root.expanded ? vMember.implicitHeight : 0
                     clip: true
-                    opacity: root.expanded ? 1 : 0
+                    opacity: root._isMemberVisible(vWrap.modelData) && root.expanded ? 1 : 0
                     anchors.horizontalCenter: parent.horizontalCenter
 
                     Behavior on height  { NumberAnimation { duration: Theme.shortDuration; easing.type: Theme.standardEasing } }
@@ -433,7 +625,7 @@ PluginComponent {
 
             // Boundary marker at the bottom — far end when expanding downward
             Item {
-                visible: root.targets.length > 0 && !root.vUp
+                visible: root.targets.length > 0 && root.targets.some(t => root._isMemberVisible(t)) && !root.vUp
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: vCapBotIcon.implicitWidth
                 height: root.expanded ? vCapBotIcon.implicitHeight : 0
@@ -476,9 +668,7 @@ PluginComponent {
                 Loader {
                     id: vToggleLoader
                     anchors.centerIn: parent
-                    sourceComponent: root.toggleArrowUsesRow
-                        ? (root.toggleArrowBeforeContent ? vToggleRowBeforeComp : vToggleRowAfterComp)
-                        : (root.toggleArrowBeforeContent ? vToggleColumnBeforeComp : vToggleColumnAfterComp)
+                    sourceComponent: root._verticalToggleSourceComponent()
                 }
 
                 MouseArea {

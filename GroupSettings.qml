@@ -25,6 +25,9 @@ PluginSettings {
     property string editMainClickButton: "right"
     property string editMainMarkerColor: "primary"
     property string editExpandIndicatorPosition: ""
+    property bool editShowArrow: true
+    property bool editShowArrowOnlyOnHover: false
+    property bool editHideMain: false
 
     onVariantsChanged: {
         localGroups.clear()
@@ -43,6 +46,9 @@ PluginSettings {
             editMainClickButton = editingGroup?.mainClickButton || "right"
             editMainMarkerColor = editingGroup?.mainMarkerColor || "primary"
             editExpandIndicatorPosition = editingGroup?.expandIndicatorPosition || ""
+            editShowArrow = editingGroup?.showArrow !== false
+            editShowArrowOnlyOnHover = editingGroup?.showArrowOnlyOnHover === true
+            editHideMain = editingGroup?.hideMain === true
             _syncMembers()
         }
     }
@@ -108,6 +114,9 @@ PluginSettings {
         editMainClickButton = v.mainClickButton || "right"
         editMainMarkerColor = v.mainMarkerColor || "primary"
         editExpandIndicatorPosition = v.expandIndicatorPosition || ""
+        editShowArrow = v.showArrow !== false
+        editShowArrowOnlyOnHover = v.showArrowOnlyOnHover === true
+        editHideMain = v.hideMain === true
         newMemberId = ""
         editingMemberIndex = -1
         memberPicker.currentValue = ""
@@ -130,7 +139,10 @@ PluginSettings {
             mainTarget: editMainTarget || "",
             mainClickButton: editMainClickButton || "right",
             mainMarkerColor: editMainMarkerColor || "primary",
-            expandIndicatorPosition: editExpandIndicatorPosition || ""
+            expandIndicatorPosition: editExpandIndicatorPosition || "",
+            showArrow: editShowArrow !== false,
+            showArrowOnlyOnHover: editShowArrow ? editShowArrowOnlyOnHover === true : false,
+            hideMain: editHideMain === true
         }
         updateVariant(editingGroupId, cfg)
         editingGroup = Object.assign({}, editingGroup, cfg)
@@ -151,6 +163,14 @@ PluginSettings {
     function _saveMainClickButton(v) { editMainClickButton = v; _saveGroupMeta() }
     function _saveMainMarkerColor(v) { editMainMarkerColor = v; _saveGroupMeta() }
     function _saveExpandIndicatorPosition(v) { editExpandIndicatorPosition = v; _saveGroupMeta() }
+    function _saveShowArrow(v) {
+        editShowArrow = v
+        if (!v)
+            editShowArrowOnlyOnHover = false
+        _saveGroupMeta()
+    }
+    function _saveShowArrowOnlyOnHover(v) { editShowArrowOnlyOnHover = v; _saveGroupMeta() }
+    function _saveHideMain(v) { editHideMain = v; _saveGroupMeta() }
     function _toggleMainTarget(id) {
         editMainTarget = editMainTarget === id ? "" : id
         _saveGroupMeta()
@@ -357,7 +377,10 @@ PluginSettings {
                         mainTarget: "",
                         mainClickButton: "right",
                         mainMarkerColor: "primary",
-                        expandIndicatorPosition: ""
+                        expandIndicatorPosition: "",
+                        showArrow: true,
+                        showArrowOnlyOnHover: false,
+                        hideMain: false
                     })
                     if (newId) {
                         Qt.callLater(() => pluginService.reloadPlugin("widgetGroup"))
@@ -716,6 +739,30 @@ PluginSettings {
                             onClicked: root._saveExpandIndicatorPosition(modelData.value)
                         }
                     }
+                }
+
+                DankToggle {
+                    width: parent.width
+                    text: "Show arrow"
+                    checked: root.editShowArrow
+                    onToggled: (checked) => root._saveShowArrow(checked)
+                }
+
+                DankToggle {
+                    width: parent.width
+                    visible: root.editShowArrow
+                    text: "Show arrow only on hover"
+                    description: "Keep the arrow hidden until the group is hovered. If the group has no icon or text, the arrow stays visible as a fallback."
+                    checked: root.editShowArrowOnlyOnHover
+                    onToggled: (checked) => root._saveShowArrowOnlyOnHover(checked)
+                }
+
+                DankToggle {
+                    width: parent.width
+                    text: "Hide main (if selected)"
+                    description: "Keep the selected main widget out of the expanded member list so it does not appear twice. The main click still activates it."
+                    checked: root.editHideMain
+                    onToggled: (checked) => root._saveHideMain(checked)
                 }
             }
 
