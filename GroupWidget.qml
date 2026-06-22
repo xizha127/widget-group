@@ -30,7 +30,6 @@ PluginComponent {
     readonly property string groupIcon: variantData?.icon || "widgets"
     readonly property string groupLabel: variantData?.label || ""
     readonly property string groupDisplay: variantData?.display || "both"
-    readonly property string expandDir: variantData?.expandDir || "right"
     readonly property string mainClickButton: variantData?.mainClickButton || "right"
     readonly property string expandIndicatorPosition: variantData?.expandIndicatorPosition || ""
     readonly property bool showArrow: variantData?.showArrow !== false
@@ -43,11 +42,45 @@ PluginComponent {
     readonly property bool showLabel: groupDisplay !== "icon" && groupLabel !== ""
     readonly property bool hasToggleContent: showIcon || showLabel
 
-    // expandDir is one value covering both orientations: left/right (horizontal
-    // bars) and up/down (vertical bars). Each pill uses the relevant pair and
-    // falls back to a sane default for the other orientation's values.
-    readonly property bool hLeft: expandDir === "left"
-    readonly property bool vUp:   expandDir === "up"
+    // Auto-orient expansion by the toggle's position on screen so members unfold
+    // toward the open part of the bar: a group in the right half opens left (up
+    // on a vertical bar), otherwise it opens right (down). Computed only while
+    // collapsed — from the toggle, which is stable then — so there's no feedback
+    // once members start growing. The chevrons, end-cap marker, and member layout
+    // all derive from hLeft/vUp, so they stay consistent with the real direction.
+    property bool _autoHLeft: false
+    property bool _autoVUp: false
+    readonly property bool hLeft: _autoHLeft
+    readonly property bool vUp:   _autoVUp
+
+    function _barExtent(vertical) {
+        const win = root.blurBarWindow
+        if (win) {
+            const d = vertical ? win.height : win.width
+            if (d > 0) return d
+        }
+        if (root.parentScreen) {
+            const d = vertical ? root.parentScreen.height : root.parentScreen.width
+            if (d > 0) return d
+        }
+        return 0
+    }
+
+    function _recomputeHDir(toggleItem) {
+        if (root.expanded || !toggleItem) return
+        const w = root._barExtent(false)
+        if (w <= 0) return
+        const cx = toggleItem.mapToItem(null, toggleItem.width / 2, 0).x
+        root._autoHLeft = cx > w / 2
+    }
+
+    function _recomputeVDir(toggleItem) {
+        if (root.expanded || !toggleItem) return
+        const h = root._barExtent(true)
+        if (h <= 0) return
+        const cy = toggleItem.mapToItem(null, 0, toggleItem.height / 2).y
+        root._autoVUp = cy > h / 2
+    }
     readonly property bool toggleArrowBeforeContent: {
         const pos = root._resolvedExpandIndicatorPosition()
         return pos === "left" || pos === "top"
@@ -153,14 +186,21 @@ PluginComponent {
         root.expanded = !root.expanded
     }
 
+    // Direction the group *visually* expands. In left/right (top/bottom) sections
+    // that's the member side. In the centre section the bar re-centres the group
+    // as it grows, shifting it opposite to the member side — so flip it there so
+    // the chevron points the way the group actually moves.
+    readonly property bool _chevronHLeft: root.section === "center" ? !root.hLeft : root.hLeft
+    readonly property bool _chevronVUp:   root.section === "center" ? !root.vUp  : root.vUp
+
     function _horizontalChevronName() {
-        return root.hLeft
+        return root._chevronHLeft
             ? (root.expanded ? "chevron_right" : "chevron_left")
             : (root.expanded ? "chevron_left" : "chevron_right")
     }
 
     function _verticalChevronName() {
-        return root.vUp
+        return root._chevronVUp
             ? (root.expanded ? "expand_more" : "expand_less")
             : (root.expanded ? "expand_less" : "expand_more")
     }
@@ -470,7 +510,10 @@ PluginComponent {
             spacing: Theme.spacingXS
             layoutDirection: root.hLeft ? Qt.RightToLeft : Qt.LeftToRight
 
-            HoverHandler { onHoveredChanged: root.hovered = hovered }
+            HoverHandler { onHoveredChanged: { root.hovered = hovered; if (hovered) root._recomputeHDir(hToggle) } }
+
+            // Recompute the unfold direction once the bar has settled.
+            Timer { interval: 150; running: true; repeat: false; onTriggered: root._recomputeHDir(hToggle) }
 
             // Toggle button
             Rectangle {
@@ -480,6 +523,8 @@ PluginComponent {
                 radius: Theme.cornerRadius
                 color: hToggleArea.containsMouse ? Theme.surfaceContainerHigh : "transparent"
                 anchors.verticalCenter: parent.verticalCenter
+                onWidthChanged: root._recomputeHDir(hToggle)
+                onXChanged: root._recomputeHDir(hToggle)
                 Loader {
                     id: hToggleLoader
                     anchors.centerIn: parent
@@ -649,7 +694,10 @@ PluginComponent {
             id: vCol
             spacing: Theme.spacingXS
 
-            HoverHandler { onHoveredChanged: root.hovered = hovered }
+            HoverHandler { onHoveredChanged: { root.hovered = hovered; if (hovered) root._recomputeVDir(vToggle) } }
+
+            // Recompute the unfold direction once the bar has settled.
+            Timer { interval: 150; running: true; repeat: false; onTriggered: root._recomputeVDir(vToggle) }
 
             // Members above the toggle (when expanding up)
             Loader {
@@ -665,6 +713,8 @@ PluginComponent {
                 radius: Theme.cornerRadius
                 color: vToggleArea.containsMouse ? Theme.surfaceContainerHigh : "transparent"
                 anchors.horizontalCenter: parent.horizontalCenter
+                onHeightChanged: root._recomputeVDir(vToggle)
+                onYChanged: root._recomputeVDir(vToggle)
                 Loader {
                     id: vToggleLoader
                     anchors.centerIn: parent

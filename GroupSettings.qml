@@ -17,7 +17,6 @@ PluginSettings {
     property string newMemberId: ""
     property int editingMemberIndex: -1
     property string editDisplay: "both"      // both | icon | text
-    property string editExpandDir: "right"   // right | left
     property bool editAutoCollapse: false
     property int editAutoCollapseSeconds: 5
     property bool editAutoCollapseOnLeave: false
@@ -106,7 +105,6 @@ PluginSettings {
         editLabelField.text = v.label || ""
         editIconField.currentIcon = v.icon || "widgets"
         editDisplay = v.display || "both"
-        editExpandDir = v.expandDir || "right"
         editAutoCollapse = v.autoCollapse === true
         editAutoCollapseSeconds = (v.autoCollapseSeconds && v.autoCollapseSeconds >= 1) ? v.autoCollapseSeconds : 5
         editAutoCollapseOnLeave = v.autoCollapseOnLeave === true
@@ -132,7 +130,6 @@ PluginSettings {
             label: editLabelField.text.trim(),
             icon: editIconField.currentIcon || "widgets",
             display: editDisplay,
-            expandDir: editExpandDir,
             autoCollapse: editAutoCollapse,
             autoCollapseSeconds: editAutoCollapseSeconds,
             autoCollapseOnLeave: editAutoCollapseOnLeave,
@@ -156,7 +153,6 @@ PluginSettings {
     }
 
     function _saveDisplay(v) { editDisplay = v; _saveGroupMeta() }
-    function _saveDir(v) { editExpandDir = v; _saveGroupMeta() }
     function _saveAutoCollapse(v) { editAutoCollapse = v; _saveGroupMeta() }
     function _saveAutoCollapseOnLeave(v) { editAutoCollapseOnLeave = v; _saveGroupMeta() }
     function _saveAutoCollapseSeconds(v) { editAutoCollapseSeconds = v; _saveGroupMeta() }
@@ -302,7 +298,7 @@ PluginSettings {
 
             StyledText {
                 width: parent.width
-                text: "1. Enable the widget plugins you want to group\n2. Create a group above, then click it to edit (click again to collapse)\n3. Set the button icon, label, and what it shows (icon/text/both)\n4. Choose which way members expand — left/right on horizontal bars, up/down on vertical\n5. Choose which click should activate the selected main widget, plus the marker color\n6. Optionally pick where the expand arrow appears relative to the button\n7. Optionally set Auto-collapse to fold the group again after a delay\n8. Add member widgets; click a member to change its plugin, use the arrows to reorder, or ✕ to remove\n9. Go to Bar Settings → Add Widget to place the group on your bar\n\nOn the bar, the configured click activates the selected main widget. The other click expands or collapses the group; when no main widget is set, either click expands normally."
+                text: "1. Enable the widget plugins you want to group\n2. Create a group above, then click it to edit (click again to collapse)\n3. Set the button icon, label, and what it shows (icon/text/both)\n4. Choose which click should activate the selected main widget, plus the marker color\n5. Optionally pick where the expand arrow appears relative to the button\n6. Optionally set Auto-collapse to fold the group again after a delay\n7. Add member widgets; click a member to change its plugin, use the arrows to reorder, or ✕ to remove\n8. Go to Bar Settings → Add Widget to place the group on your bar\n\nMembers unfold toward the open part of the bar (right-side groups open left, others open right; below vs. above on a vertical bar) and the bar makes room automatically.\n\nOn the bar, the configured click activates the selected main widget. The other click expands or collapses the group; when no main widget is set, either click expands normally."
                 font.pixelSize: Theme.fontSizeSmall
                 color: Theme.surfaceVariantText
                 wrapMode: Text.WordWrap
@@ -372,7 +368,6 @@ PluginSettings {
                         icon: root.newGroupIcon || "widgets",
                         label: "",
                         display: "both",
-                        expandDir: "right",
                         targets: [],
                         mainTarget: "",
                         mainClickButton: "right",
@@ -630,27 +625,13 @@ PluginSettings {
                 width: parent.width
                 spacing: Theme.spacingXS
 
-                StyledText { text: "Members appear (left/right for horizontal bars, up/down for vertical)"; font.pixelSize: Theme.fontSizeSmall; color: Theme.surfaceVariantText; width: parent.width; wrapMode: Text.WordWrap }
-                Flow {
+                StyledText { text: "How members expand"; font.pixelSize: Theme.fontSizeSmall; color: Theme.surfaceVariantText }
+                StyledText {
                     width: parent.width
-                    spacing: Theme.spacingS
-                    Repeater {
-                            model: [
-                                { value: "right", label: "Right", icon: "chevron_right" },
-                                { value: "left",  label: "Left",  icon: "chevron_left" },
-                                { value: "down",  label: "Down",  icon: "keyboard_arrow_down" },
-                                { value: "up",    label: "Up",    icon: "keyboard_arrow_up" }
-                            ]
-                            delegate: DankButton {
-                                required property var modelData
-                                text: modelData.label
-                                iconName: modelData.icon
-                                buttonHeight: 32
-                                backgroundColor: root.editExpandDir === modelData.value ? Theme.primary : Theme.surfaceContainerHigh
-                                textColor: root.editExpandDir === modelData.value ? Theme.onPrimary : Theme.surfaceText
-                                onClicked: root._saveDir(modelData.value)
-                        }
-                    }
+                    text: "When expanded, the grouped widgets unfold toward the open part of the bar: a group on the right side opens to the left, otherwise it opens to the right (and the equivalent below/above on a vertical bar). The direction adjusts automatically to where the group sits — and the chevrons follow it — so there's nothing to configure."
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceVariantText
+                    wrapMode: Text.WordWrap
                 }
             }
 
