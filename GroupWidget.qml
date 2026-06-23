@@ -66,12 +66,19 @@ PluginComponent {
         return 0
     }
 
+    // Deadband around the centre: near the midpoint the toggle's position can sit
+    // exactly on the boundary and jitter cx > w/2 back and forth, which flips
+    // _autoHLeft and cancels the chevron's expand/collapse flip. Only commit a
+    // change once the toggle is clearly past centre; keep the current value inside
+    // the band.
     function _recomputeHDir(toggleItem) {
         if (root.expanded || !toggleItem) return
         const w = root._barExtent(false)
         if (w <= 0) return
         const cx = toggleItem.mapToItem(null, toggleItem.width / 2, 0).x
-        root._autoHLeft = cx > w / 2
+        const margin = w * 0.04
+        if (cx > w / 2 + margin) root._autoHLeft = true
+        else if (cx < w / 2 - margin) root._autoHLeft = false
     }
 
     function _recomputeVDir(toggleItem) {
@@ -79,7 +86,9 @@ PluginComponent {
         const h = root._barExtent(true)
         if (h <= 0) return
         const cy = toggleItem.mapToItem(null, 0, toggleItem.height / 2).y
-        root._autoVUp = cy > h / 2
+        const margin = h * 0.04
+        if (cy > h / 2 + margin) root._autoVUp = true
+        else if (cy < h / 2 - margin) root._autoVUp = false
     }
     readonly property bool toggleArrowBeforeContent: {
         const pos = root._resolvedExpandIndicatorPosition()
@@ -177,6 +186,49 @@ PluginComponent {
         return vToggleRowAfterComp
     }
 
+    // The end caps mirror the toggle: group icon + collapse symbol, arranged by
+    // the same expand/collapse-symbol position the user picks for the toggle.
+    function _capSourceComponent() {
+        const pos = root._resolvedExpandIndicatorPosition()
+        if (pos === "left")   return capRowBeforeComp
+        if (pos === "top")    return capColumnBeforeComp
+        if (pos === "bottom") return capColumnAfterComp
+        return capRowAfterComp   // "right"
+    }
+
+    Component {
+        id: capRowAfterComp
+        Row {
+            spacing: Theme.spacingXS
+            DankIcon { visible: root.showIcon; name: root.groupIcon; size: root.iconSize; color: Theme.surfaceText; anchors.verticalCenter: parent.verticalCenter }
+            DankIcon { name: root._hChevron; rotation: 90; size: root.iconSize - 8; color: Theme.surfaceVariantText; anchors.verticalCenter: parent.verticalCenter }
+        }
+    }
+    Component {
+        id: capRowBeforeComp
+        Row {
+            spacing: Theme.spacingXS
+            DankIcon { name: root._hChevron; rotation: 90; size: root.iconSize - 8; color: Theme.surfaceVariantText; anchors.verticalCenter: parent.verticalCenter }
+            DankIcon { visible: root.showIcon; name: root.groupIcon; size: root.iconSize; color: Theme.surfaceText; anchors.verticalCenter: parent.verticalCenter }
+        }
+    }
+    Component {
+        id: capColumnAfterComp
+        Column {
+            spacing: 1
+            DankIcon { visible: root.showIcon; name: root.groupIcon; size: root.iconSize; color: Theme.surfaceText; anchors.horizontalCenter: parent.horizontalCenter }
+            DankIcon { name: root._vChevron; size: root.iconSize - 8; color: Theme.surfaceVariantText; anchors.horizontalCenter: parent.horizontalCenter }
+        }
+    }
+    Component {
+        id: capColumnBeforeComp
+        Column {
+            spacing: 1
+            DankIcon { name: root._vChevron; size: root.iconSize - 8; color: Theme.surfaceVariantText; anchors.horizontalCenter: parent.horizontalCenter }
+            DankIcon { visible: root.showIcon; name: root.groupIcon; size: root.iconSize; color: Theme.surfaceText; anchors.horizontalCenter: parent.horizontalCenter }
+        }
+    }
+
     function _handleGroupClick(button) {
         if (root.mainTarget) {
             const activateButton = root.mainClickButton === "left" ? Qt.LeftButton : Qt.RightButton
@@ -186,24 +238,12 @@ PluginComponent {
         root.expanded = !root.expanded
     }
 
-    // Direction the group *visually* expands. In left/right (top/bottom) sections
-    // that's the member side. In the centre section the bar re-centres the group
-    // as it grows, shifting it opposite to the member side — so flip it there so
-    // the chevron points the way the group actually moves.
-    readonly property bool _chevronHLeft: root.section === "center" ? !root.hLeft : root.hLeft
-    readonly property bool _chevronVUp:   root.section === "center" ? !root.vUp  : root.vUp
-
-    function _horizontalChevronName() {
-        return root._chevronHLeft
-            ? (root.expanded ? "chevron_right" : "chevron_left")
-            : (root.expanded ? "chevron_left" : "chevron_right")
-    }
-
-    function _verticalChevronName() {
-        return root._chevronVUp
-            ? (root.expanded ? "expand_more" : "expand_less")
-            : (root.expanded ? "expand_less" : "expand_more")
-    }
+    // Symmetric opposing-chevron icons that flip on expand/collapse only — there's
+    // no left/right direction to compute, so this behaves identically in every
+    // section (and sidesteps the centre-drift ambiguity entirely). The horizontal
+    // toggle rotates the icon 90° so it reads as ‹ › / › ‹.
+    readonly property string _hChevron: root.expanded ? "unfold_less" : "unfold_more"
+    readonly property string _vChevron: root.expanded ? "unfold_less" : "unfold_more"
 
     function _activateMainMember() {
         const member = root._mainMember()
@@ -248,7 +288,8 @@ PluginComponent {
     Component {
         id: hToggleArrowComp
         DankIcon {
-            name: root._horizontalChevronName()
+            name: root._hChevron
+            rotation: 90   // unfold icons are vertical; rotate so they read ‹ › / › ‹
             size: root.iconSize - 8
             color: Theme.surfaceVariantText
             anchors.verticalCenter: parent.verticalCenter
@@ -388,7 +429,7 @@ PluginComponent {
     Component {
         id: vToggleArrowComp
         DankIcon {
-            name: root._verticalChevronName()
+            name: root._vChevron
             size: root.iconSize - 8
             color: Theme.surfaceVariantText
             anchors.horizontalCenter: parent.horizontalCenter
@@ -505,12 +546,28 @@ PluginComponent {
 
     // ── Horizontal bar pill ──────────────────────────────────────────────────
     horizontalBarPill: Component {
-        Row {
-            id: hRow
-            spacing: Theme.spacingXS
-            layoutDirection: root.hLeft ? Qt.RightToLeft : Qt.LeftToRight
+        Item {
+            implicitWidth: hRow.width
+            implicitHeight: hRow.height
 
-            HoverHandler { onHoveredChanged: { root.hovered = hovered; if (hovered) root._recomputeHDir(hToggle) } }
+            // Solid backing shown while expanded so the group stays readable when
+            // its members overlap an adjacent bar section (the bar itself may be
+            // transparent, making overlapping icons blend together otherwise).
+            Rectangle {
+                anchors.fill: hRow
+                radius: Theme.cornerRadius
+                color: Theme.surfaceContainerHigh
+                opacity: root.expanded ? 1 : 0
+                visible: opacity > 0
+                Behavior on opacity { NumberAnimation { duration: Theme.shortDuration } }
+            }
+
+            Row {
+                id: hRow
+                spacing: Theme.spacingXS
+                layoutDirection: root.hLeft ? Qt.RightToLeft : Qt.LeftToRight
+
+                HoverHandler { onHoveredChanged: { root.hovered = hovered; if (hovered) root._recomputeHDir(hToggle) } }
 
             // Recompute the unfold direction once the bar has settled.
             Timer { interval: 150; running: true; repeat: false; onTriggered: root._recomputeHDir(hToggle) }
@@ -521,10 +578,8 @@ PluginComponent {
                 width: hToggleLoader.implicitWidth + Theme.spacingS * 2
                 height: hToggleLoader.implicitHeight + Theme.spacingXS * 2
                 radius: Theme.cornerRadius
-                color: hToggleArea.containsMouse ? Theme.surfaceContainerHigh : "transparent"
+                color: hToggleArea.containsMouse ? Theme.primaryHover : "transparent"
                 anchors.verticalCenter: parent.verticalCenter
-                onWidthChanged: root._recomputeHDir(hToggle)
-                onXChanged: root._recomputeHDir(hToggle)
                 Loader {
                     id: hToggleLoader
                     anchors.centerIn: parent
@@ -584,28 +639,39 @@ PluginComponent {
                 }
             }
 
-            // Group boundary marker — a chevron at the far end, mirroring the
-            // toggle's chevron and pointing back toward it, so the group's extent
-            // is clear and symmetric when expanded.
-            Item {
+            // Group end cap — a matching button at the far end (group icon + the
+            // collapse chevron), so there's a collapse control with a clear hover
+            // target at both ends of the expanded panel.
+            Rectangle {
+                id: hCap
                 visible: root.targets.length > 0 && root.targets.some(t => root._isMemberVisible(t))
-                width: root.expanded ? hCapIcon.implicitWidth : 0
-                height: hCapIcon.implicitHeight
+                width: root.expanded ? hCapLoader.implicitWidth + Theme.spacingS * 2 : 0
+                height: hCapLoader.implicitHeight + Theme.spacingXS * 2
+                radius: Theme.cornerRadius
+                color: hCapArea.containsMouse ? Theme.primaryHover : "transparent"
                 opacity: root.expanded ? 1 : 0
+                clip: true
                 anchors.verticalCenter: parent.verticalCenter
                 Behavior on width   { NumberAnimation { duration: Theme.shortDuration; easing.type: Theme.standardEasing } }
                 Behavior on opacity { NumberAnimation { duration: Theme.shortDuration } }
+                Behavior on color   { ColorAnimation { duration: Theme.shortDuration } }
 
-                DankIcon {
-                    id: hCapIcon
+                Loader {
+                    id: hCapLoader
                     anchors.centerIn: parent
-                    // Pull toward the last widget to cancel the Row's inter-widget gap
-                    anchors.horizontalCenterOffset: root.hLeft ? Theme.spacingXS : -Theme.spacingXS
-                    name: root.hLeft ? "keyboard_double_arrow_right" : "keyboard_double_arrow_left"
-                    size: root.iconSize - 8
-                    color: Theme.surfaceVariantText
+                    sourceComponent: root._capSourceComponent()
+                }
+
+                MouseArea {
+                    id: hCapArea
+                    anchors.fill: parent
+                    enabled: root.expanded
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.expanded = false
                 }
             }
+        }
         }
     }
 
@@ -616,22 +682,34 @@ PluginComponent {
         Column {
             spacing: Theme.spacingXS
 
-            // Boundary marker at the top — far end when expanding upward
-            Item {
+            // End cap at the top — far end when expanding upward
+            Rectangle {
+                id: vCapTop
                 visible: root.targets.length > 0 && root.targets.some(t => root._isMemberVisible(t)) && root.vUp
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: vCapTopIcon.implicitWidth
-                height: root.expanded ? vCapTopIcon.implicitHeight : 0
+                width: vCapTopLoader.implicitWidth + Theme.spacingXS * 2
+                height: root.expanded ? vCapTopLoader.implicitHeight + Theme.spacingXS * 2 : 0
+                radius: Theme.cornerRadius
+                color: vCapTopArea.containsMouse ? Theme.primaryHover : "transparent"
                 opacity: root.expanded ? 1 : 0
+                clip: true
                 Behavior on height  { NumberAnimation { duration: Theme.shortDuration; easing.type: Theme.standardEasing } }
                 Behavior on opacity { NumberAnimation { duration: Theme.shortDuration } }
-                DankIcon {
-                    id: vCapTopIcon
+                Behavior on color   { ColorAnimation { duration: Theme.shortDuration } }
+
+                Loader {
+                    id: vCapTopLoader
                     anchors.centerIn: parent
-                    anchors.verticalCenterOffset: Theme.spacingXS
-                    name: "keyboard_double_arrow_down"
-                    size: root.iconSize - 8
-                    color: Theme.surfaceVariantText
+                    sourceComponent: root._capSourceComponent()
+                }
+
+                MouseArea {
+                    id: vCapTopArea
+                    anchors.fill: parent
+                    enabled: root.expanded
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.expanded = false
                 }
             }
 
@@ -668,36 +746,63 @@ PluginComponent {
                 }
             }
 
-            // Boundary marker at the bottom — far end when expanding downward
-            Item {
+            // End cap at the bottom — far end when expanding downward
+            Rectangle {
+                id: vCapBot
                 visible: root.targets.length > 0 && root.targets.some(t => root._isMemberVisible(t)) && !root.vUp
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: vCapBotIcon.implicitWidth
-                height: root.expanded ? vCapBotIcon.implicitHeight : 0
+                width: vCapBotLoader.implicitWidth + Theme.spacingXS * 2
+                height: root.expanded ? vCapBotLoader.implicitHeight + Theme.spacingXS * 2 : 0
+                radius: Theme.cornerRadius
+                color: vCapBotArea.containsMouse ? Theme.primaryHover : "transparent"
                 opacity: root.expanded ? 1 : 0
+                clip: true
                 Behavior on height  { NumberAnimation { duration: Theme.shortDuration; easing.type: Theme.standardEasing } }
                 Behavior on opacity { NumberAnimation { duration: Theme.shortDuration } }
-                DankIcon {
-                    id: vCapBotIcon
+                Behavior on color   { ColorAnimation { duration: Theme.shortDuration } }
+
+                Loader {
+                    id: vCapBotLoader
                     anchors.centerIn: parent
-                    anchors.verticalCenterOffset: -Theme.spacingXS
-                    name: "keyboard_double_arrow_up"
-                    size: root.iconSize - 8
-                    color: Theme.surfaceVariantText
+                    sourceComponent: root._capSourceComponent()
+                }
+
+                MouseArea {
+                    id: vCapBotArea
+                    anchors.fill: parent
+                    enabled: root.expanded
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.expanded = false
                 }
             }
         }
     }
 
     verticalBarPill: Component {
-        Column {
-            id: vCol
-            spacing: Theme.spacingXS
+        Item {
+            implicitWidth: vCol.width
+            implicitHeight: vCol.height
 
-            HoverHandler { onHoveredChanged: { root.hovered = hovered; if (hovered) root._recomputeVDir(vToggle) } }
+            // Solid backing shown while expanded so the group stays readable when
+            // its members overlap an adjacent bar section.
+            Rectangle {
+                anchors.fill: vCol
+                radius: Theme.cornerRadius
+                color: Theme.surfaceContainerHigh
+                opacity: root.expanded ? 1 : 0
+                visible: opacity > 0
+                Behavior on opacity { NumberAnimation { duration: Theme.shortDuration } }
+            }
 
-            // Recompute the unfold direction once the bar has settled.
-            Timer { interval: 150; running: true; repeat: false; onTriggered: root._recomputeVDir(vToggle) }
+            Column {
+                id: vCol
+                spacing: Theme.spacingXS
+
+                HoverHandler { onHoveredChanged: { root.hovered = hovered; if (hovered) root._recomputeVDir(vToggle) } }
+
+                // Recompute the unfold direction once the bar has settled.
+                Timer { interval: 150; running: true; repeat: false; onTriggered: root._recomputeVDir(vToggle) }
 
             // Members above the toggle (when expanding up)
             Loader {
@@ -711,10 +816,8 @@ PluginComponent {
                 width: vToggleLoader.implicitWidth + Theme.spacingXS * 2
                 height: vToggleLoader.implicitHeight + Theme.spacingS * 2
                 radius: Theme.cornerRadius
-                color: vToggleArea.containsMouse ? Theme.surfaceContainerHigh : "transparent"
+                color: vToggleArea.containsMouse ? Theme.primaryHover : "transparent"
                 anchors.horizontalCenter: parent.horizontalCenter
-                onHeightChanged: root._recomputeVDir(vToggle)
-                onYChanged: root._recomputeVDir(vToggle)
                 Loader {
                     id: vToggleLoader
                     anchors.centerIn: parent
@@ -739,6 +842,7 @@ PluginComponent {
                 sourceComponent: vMembersComp
                 anchors.horizontalCenter: parent.horizontalCenter
             }
+        }
         }
     }
 }

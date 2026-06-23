@@ -298,7 +298,7 @@ PluginSettings {
 
             StyledText {
                 width: parent.width
-                text: "1. Enable the widget plugins you want to group\n2. Create a group above, then click it to edit (click again to collapse)\n3. Set the button icon, label, and what it shows (icon/text/both)\n4. Choose which click should activate the selected main widget, plus the marker color\n5. Optionally pick where the expand arrow appears relative to the button\n6. Optionally set Auto-collapse to fold the group again after a delay\n7. Add member widgets; click a member to change its plugin, use the arrows to reorder, or ✕ to remove\n8. Go to Bar Settings → Add Widget to place the group on your bar\n\nMembers unfold toward the open part of the bar (right-side groups open left, others open right; below vs. above on a vertical bar) and the bar makes room automatically.\n\nOn the bar, the configured click activates the selected main widget. The other click expands or collapses the group; when no main widget is set, either click expands normally."
+                text: "1. Enable the widget plugins you want to group\n2. Create a group above, then click it to edit (click again to collapse)\n3. Set the button icon, label, and what it shows (icon/text/both)\n4. Choose which click should activate the selected main widget, plus the marker color\n5. Optionally pick where the expand/collapse symbol appears relative to the button\n6. Optionally set Auto-collapse to fold the group again after a delay\n7. Add member widgets; click a member to change its plugin, use the arrows to reorder, or ✕ to remove\n8. Go to Bar Settings → Add Widget to place the group on your bar\n\nMembers unfold toward the open part of the bar (right-side groups open left, others open right; below vs. above on a vertical bar) and the bar makes room automatically.\n\nOn the bar, the configured click activates the selected main widget. The other click expands or collapses the group; when no main widget is set, either click expands normally."
                 font.pixelSize: Theme.fontSizeSmall
                 color: Theme.surfaceVariantText
                 wrapMode: Text.WordWrap
@@ -647,7 +647,7 @@ PluginSettings {
 
                 StyledText {
                     width: parent.width
-                    text: "Choose which click activates the selected main widget, what color marks it, and where the expand arrow appears."
+                    text: "Choose which click activates the selected main widget, what color marks it, and where the expand/collapse symbol appears."
                     font.pixelSize: Theme.fontSizeSmall
                     color: Theme.surfaceVariantText
                     wrapMode: Text.WordWrap
@@ -699,7 +699,7 @@ PluginSettings {
                     }
                 }
 
-                StyledText { text: "Expand arrow position"; font.pixelSize: Theme.fontSizeSmall; color: Theme.surfaceVariantText }
+                StyledText { text: "Expand/collapse symbol position"; font.pixelSize: Theme.fontSizeSmall; color: Theme.surfaceVariantText }
                 Flow {
                     width: parent.width
                     spacing: Theme.spacingS
@@ -724,7 +724,7 @@ PluginSettings {
 
                 DankToggle {
                     width: parent.width
-                    text: "Show arrow"
+                    text: "Show expand/collapse symbol"
                     checked: root.editShowArrow
                     onToggled: (checked) => root._saveShowArrow(checked)
                 }
@@ -732,8 +732,8 @@ PluginSettings {
                 DankToggle {
                     width: parent.width
                     visible: root.editShowArrow
-                    text: "Show arrow only on hover"
-                    description: "Keep the arrow hidden until the group is hovered. If the group has no icon or text, the arrow stays visible as a fallback."
+                    text: "Show symbol only on hover"
+                    description: "Keep the expand/collapse symbol hidden until the group is hovered. If the group has no icon or text, the symbol stays visible as a fallback."
                     checked: root.editShowArrowOnlyOnHover
                     onToggled: (checked) => root._saveShowArrowOnlyOnHover(checked)
                 }
