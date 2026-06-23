@@ -27,6 +27,7 @@ PluginSettings {
     property bool editShowArrow: true
     property bool editShowArrowOnlyOnHover: false
     property bool editHideMain: false
+    property bool editCollapseOthers: false
 
     onVariantsChanged: {
         localGroups.clear()
@@ -48,6 +49,7 @@ PluginSettings {
             editShowArrow = editingGroup?.showArrow !== false
             editShowArrowOnlyOnHover = editingGroup?.showArrowOnlyOnHover === true
             editHideMain = editingGroup?.hideMain === true
+            editCollapseOthers = editingGroup?.collapseOthers === true
             _syncMembers()
         }
     }
@@ -115,6 +117,7 @@ PluginSettings {
         editShowArrow = v.showArrow !== false
         editShowArrowOnlyOnHover = v.showArrowOnlyOnHover === true
         editHideMain = v.hideMain === true
+        editCollapseOthers = v.collapseOthers === true
         newMemberId = ""
         editingMemberIndex = -1
         memberPicker.currentValue = ""
@@ -139,7 +142,8 @@ PluginSettings {
             expandIndicatorPosition: editExpandIndicatorPosition || "",
             showArrow: editShowArrow !== false,
             showArrowOnlyOnHover: editShowArrow ? editShowArrowOnlyOnHover === true : false,
-            hideMain: editHideMain === true
+            hideMain: editHideMain === true,
+            collapseOthers: editCollapseOthers === true
         }
         updateVariant(editingGroupId, cfg)
         editingGroup = Object.assign({}, editingGroup, cfg)
@@ -167,6 +171,7 @@ PluginSettings {
     }
     function _saveShowArrowOnlyOnHover(v) { editShowArrowOnlyOnHover = v; _saveGroupMeta() }
     function _saveHideMain(v) { editHideMain = v; _saveGroupMeta() }
+    function _saveCollapseOthers(v) { editCollapseOthers = v; _saveGroupMeta() }
     function _toggleMainTarget(id) {
         editMainTarget = editMainTarget === id ? "" : id
         _saveGroupMeta()
@@ -375,7 +380,8 @@ PluginSettings {
                         expandIndicatorPosition: "",
                         showArrow: true,
                         showArrowOnlyOnHover: false,
-                        hideMain: false
+                        hideMain: false,
+                        collapseOthers: false
                     })
                     if (newId) {
                         Qt.callLater(() => pluginService.reloadPlugin("widgetGroup"))
@@ -744,6 +750,14 @@ PluginSettings {
                     description: "Keep the selected main widget out of the expanded member list so it does not appear twice. The main click still activates it."
                     checked: root.editHideMain
                     onToggled: (checked) => root._saveHideMain(checked)
+                }
+
+                DankToggle {
+                    width: parent.width
+                    text: "Collapse other groups when this opens"
+                    description: "When this group expands, automatically collapse any other open group. Enable it on each group for strict one-open-at-a-time behaviour."
+                    checked: root.editCollapseOthers
+                    onToggled: (checked) => root._saveCollapseOthers(checked)
                 }
             }
 

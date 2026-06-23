@@ -16,12 +16,26 @@ PluginComponent {
 
     property bool expanded: false
 
+    // When this group expands and "collapse others" is on, broadcast our id via a
+    // shared (in-memory) global var; every other group instance collapses itself.
+    onExpandedChanged: {
+        if (root.expanded && root.collapseOthers && pluginService)
+            pluginService.setGlobalVar(root.pluginId, "openGroup", root.variantId)
+    }
+
     Connections {
         target: pluginService
         function onPluginDataChanged(changedId) {
             if (changedId !== root.pluginId || root.variantId === "") return
             const fresh = pluginService.getPluginVariantData(root.pluginId, root.variantId)
             if (fresh) root.variantData = fresh
+        }
+        function onGlobalVarChanged(changedId, varName) {
+            if (changedId !== root.pluginId || varName !== "openGroup")
+                return
+            const opener = pluginService.getGlobalVar(root.pluginId, "openGroup", "")
+            if (opener && opener !== root.variantId && root.expanded)
+                root.expanded = false
         }
     }
 
@@ -35,6 +49,7 @@ PluginComponent {
     readonly property bool showArrow: variantData?.showArrow !== false
     readonly property bool showArrowOnlyOnHover: variantData?.showArrowOnlyOnHover === true
     readonly property bool hideMain: variantData?.hideMain === true
+    readonly property bool collapseOthers: variantData?.collapseOthers === true
 
     property var _memberRefs: ({})
 
