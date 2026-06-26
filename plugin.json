@@ -2,7 +2,7 @@
   "id": "widgetGroup",
   "name": "Widget Group",
   "description": "One bar button that expands to reveal a group of widgets inline, each with its own live pill and popout",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "author": "rdannenbring",
   "type": "widget",
   "category": "utilities",

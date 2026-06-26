@@ -20,19 +20,23 @@ Bars get crowded. Widget Group lets you fold a cluster of widgets behind one but
 
 ## Features
 
-- **Group any widget plugins** behind one bar button; expand/collapse with a click.
+- **Group any widgets** behind one bar button — both third-party widget plugins **and DMS built-in bar widgets** (clock, media, system tray, monitors, control center, …).
 - Members are the **real widgets** — live pills and fully working popouts.
-- **Expand direction**: left/right on horizontal bars, up/down on vertical bars.
-- **Boundary marker**: when expanded, a double-chevron at the far end makes the group's extent obvious (and mirrors the toggle for symmetry).
+- **Auto-oriented expansion**: the group expands toward the open side of the bar automatically (left/right on horizontal bars, up/down on vertical) — no direction to configure.
+- **Main widget** (optional): designate one member as the group's main. A configurable click of the button runs it directly; the other click expands/collapses. Optionally hide the main from the expanded list so it doesn't appear twice.
+- **Expand/collapse symbols**: an unfold symbol on the button plus a matching end-cap button at the far end (group icon + collapse control), with a configurable symbol position.
+- **Overlay mode** (optional): expand **without pushing** neighbouring widgets — members overflow and paint on top instead. Paints over reliably for a group in the centre section.
+- **One open at a time** (optional): expanding a group can auto-collapse any other open group.
+- **Readable when overlapping**: a solid backing behind the expanded group, with an optional border so it stays delineated even on opaque bars.
 - **Button display**: icon, label, or both; choose the button icon from a searchable Material icon picker.
 - **Auto-collapse** (optional): collapse after a configurable delay (1–30s), with an option to only start the timer once the mouse leaves the expanded group.
 - **Multiple groups** via variants — each is a separate bar widget.
-- Add / reorder / change / remove members; collapsible editor.
+- Add / drag-reorder / change / remove members; collapsible editor.
 
 ## Requirements
 
 - DankMaterialShell (quickshell-based) with the plugin system.
-- The plugins you want to group must be **widget**-type plugins and **enabled**.
+- Members can be DMS **built-in** bar widgets, or third-party **widget**-type plugins (those must be **enabled**).
 
 ## Install
 
@@ -55,17 +59,18 @@ Then enable it in **DMS Settings → Plugins**, configure a group, and add it to
 
 ## Usage
 
-1. Enable the widget plugins you want to group.
+1. Enable any third-party widget plugins you want to group (built-ins need no setup).
 2. Enable Widget Group in **Settings → Plugins** and open its settings.
-3. Create a group, then click it to edit (button icon/label/display, expand direction, auto-collapse).
-4. Add member widgets; click a member to change its plugin, reorder, or remove.
+3. Create a group, then click it to edit (button icon/label/display, main widget + click action, expand/collapse symbol, overlay, one-open-at-a-time, auto-collapse).
+4. Add members; use the **star** to pick the main widget and the **×** to remove. Drag the handle to reorder.
 5. **Bar Settings → Add Widget** to place the group on your bar.
 
 On the bar, click the button (▾/▴ or ‹/›) to show or hide the members.
 
 ## Notes & caveats
 
-- Only **widget** plugins can be members (they have a bar pill + popout). Daemon/launcher/desktop plugins aren't applicable.
+- Third-party members must be **widget** plugins (they have a bar pill + popout). Daemon/launcher/desktop plugins aren't applicable. DMS built-in bar widgets can also be added directly.
+- **Overlay mode** keeps the collapsed footprint and paints members on top of neighbours. Because bar sections paint in a fixed order (centre on top), the "paint over" is reliable for a group in the **centre** section; a left/right group only paints over its own section. Members fill any free space in their own section first, then spill over.
 - With **auto-collapse → only after mouse leaves**: if you open a member's popout and move onto that popout window, the group counts it as "mouse left" and collapses after the delay. The member's popout itself stays open.
 
 ## How it works
