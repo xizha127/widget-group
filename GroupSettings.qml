@@ -28,6 +28,8 @@ PluginSettings {
     property bool editShowArrowOnlyOnHover: false
     property bool editHideMain: false
     property bool editCollapseOthers: false
+    property bool editOverlayExpand: false
+    property bool editShowExpandedBorder: true
 
     onVariantsChanged: {
         localGroups.clear()
@@ -50,6 +52,8 @@ PluginSettings {
             editShowArrowOnlyOnHover = editingGroup?.showArrowOnlyOnHover === true
             editHideMain = editingGroup?.hideMain === true
             editCollapseOthers = editingGroup?.collapseOthers === true
+            editOverlayExpand = editingGroup?.overlayExpand === true
+            editShowExpandedBorder = editingGroup?.showExpandedBorder !== false
             _syncMembers()
         }
     }
@@ -118,6 +122,8 @@ PluginSettings {
         editShowArrowOnlyOnHover = v.showArrowOnlyOnHover === true
         editHideMain = v.hideMain === true
         editCollapseOthers = v.collapseOthers === true
+        editOverlayExpand = v.overlayExpand === true
+        editShowExpandedBorder = v.showExpandedBorder !== false
         newMemberId = ""
         editingMemberIndex = -1
         memberPicker.currentValue = ""
@@ -143,7 +149,9 @@ PluginSettings {
             showArrow: editShowArrow !== false,
             showArrowOnlyOnHover: editShowArrow ? editShowArrowOnlyOnHover === true : false,
             hideMain: editHideMain === true,
-            collapseOthers: editCollapseOthers === true
+            collapseOthers: editCollapseOthers === true,
+            overlayExpand: editOverlayExpand === true,
+            showExpandedBorder: editShowExpandedBorder === true
         }
         updateVariant(editingGroupId, cfg)
         editingGroup = Object.assign({}, editingGroup, cfg)
@@ -172,6 +180,8 @@ PluginSettings {
     function _saveShowArrowOnlyOnHover(v) { editShowArrowOnlyOnHover = v; _saveGroupMeta() }
     function _saveHideMain(v) { editHideMain = v; _saveGroupMeta() }
     function _saveCollapseOthers(v) { editCollapseOthers = v; _saveGroupMeta() }
+    function _saveOverlayExpand(v) { editOverlayExpand = v; _saveGroupMeta() }
+    function _saveShowExpandedBorder(v) { editShowExpandedBorder = v; _saveGroupMeta() }
     function _toggleMainTarget(id) {
         editMainTarget = editMainTarget === id ? "" : id
         _saveGroupMeta()
@@ -381,7 +391,9 @@ PluginSettings {
                         showArrow: true,
                         showArrowOnlyOnHover: false,
                         hideMain: false,
-                        collapseOthers: false
+                        collapseOthers: false,
+                        overlayExpand: false,
+                        showExpandedBorder: true
                     })
                     if (newId) {
                         Qt.callLater(() => pluginService.reloadPlugin("widgetGroup"))
@@ -759,6 +771,22 @@ PluginSettings {
                     checked: root.editCollapseOthers
                     onToggled: (checked) => root._saveCollapseOthers(checked)
                 }
+
+                DankToggle {
+                    width: parent.width
+                    text: "Overlay when expanded (don't push other widgets)"
+                    description: "Keep the bar footprint at the collapsed size when expanded — members overflow and paint on top of neighbouring widgets instead of pushing them aside. They first fill any free space in this group's own section, then spill over. Paints over reliably for a group in the centre section; a left/right group can only paint over its own section."
+                    checked: root.editOverlayExpand
+                    onToggled: (checked) => root._saveOverlayExpand(checked)
+                }
+
+                DankToggle {
+                    width: parent.width
+                    text: "Show border around expanded group"
+                    description: "Draw a thin outline around the expanded group's backing so it stays delineated from the bar — useful when the bar background is opaque and a similar tone."
+                    checked: root.editShowExpandedBorder
+                    onToggled: (checked) => root._saveShowExpandedBorder(checked)
+                }
             }
 
             Rectangle { width: parent.width; height: 1; color: Theme.outlineVariant; opacity: 0.5 }
@@ -946,6 +974,27 @@ PluginSettings {
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: root._toggleMainTarget(mid)
                             }
+
+                            Rectangle {
+                                visible: mainArea.containsMouse
+                                z: 1000
+                                anchors.bottom: parent.top
+                                anchors.bottomMargin: Theme.spacingXS
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: mMainTip.implicitWidth + Theme.spacingM
+                                height: mMainTip.implicitHeight + Theme.spacingXS * 2
+                                radius: Theme.cornerRadius
+                                color: Theme.surfaceContainerHigh
+                                border.width: 1
+                                border.color: Theme.outlineVariant
+                                StyledText {
+                                    id: mMainTip
+                                    anchors.centerIn: parent
+                                    text: "Main widget toggle"
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.surfaceText
+                                }
+                            }
                         }
 
                         Rectangle {
@@ -960,6 +1009,27 @@ PluginSettings {
                                     const a = root._currentMembers()
                                     a.splice(index, 1)
                                     root._saveMembers(a)
+                                }
+                            }
+
+                            Rectangle {
+                                visible: mDelArea.containsMouse
+                                z: 1000
+                                anchors.bottom: parent.top
+                                anchors.bottomMargin: Theme.spacingXS
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: mDelTip.implicitWidth + Theme.spacingM
+                                height: mDelTip.implicitHeight + Theme.spacingXS * 2
+                                radius: Theme.cornerRadius
+                                color: Theme.surfaceContainerHigh
+                                border.width: 1
+                                border.color: Theme.outlineVariant
+                                StyledText {
+                                    id: mDelTip
+                                    anchors.centerIn: parent
+                                    text: "Remove from group"
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.surfaceText
                                 }
                             }
                         }

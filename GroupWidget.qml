@@ -50,6 +50,29 @@ PluginComponent {
     readonly property bool showArrowOnlyOnHover: variantData?.showArrowOnlyOnHover === true
     readonly property bool hideMain: variantData?.hideMain === true
     readonly property bool collapseOthers: variantData?.collapseOthers === true
+    // Overlay mode: when expanded, don't reserve layout space (don't push other
+    // widgets) — members overflow and paint on top instead.
+    readonly property bool overlayExpand: variantData?.overlayExpand === true
+    // Outline around the expanded backing (helps delineate the group on opaque bars).
+    readonly property bool showExpandedBorder: variantData?.showExpandedBorder !== false
+
+    // Paint over neighbouring widgets by raising the bar's section-delegate z.
+    // Reaches into the bar item tree (root → WidgetHost → section cell), so it's
+    // best-effort: if the hierarchy differs it simply no-ops (members would just
+    // render under later siblings, as without overlay).
+    //
+    // Tied to the *setting*, not the expanded state: raise it once and leave it,
+    // so collapsing and re-expanding can't drop us back behind a neighbour (a
+    // collapsed group is only the toggle, so a high z has no visual cost).
+    function _updateOverlayZ() {
+        const want = root.overlayExpand ? 1000 : 0
+        const host = root.parent                   // WidgetHost (Loader)
+        const cell = host ? host.parent : null     // section-row delegate (the painting sibling)
+        if (host) host.z = want
+        if (cell) cell.z = want
+    }
+    onOverlayExpandChanged: _updateOverlayZ()
+    Component.onCompleted: Qt.callLater(_updateOverlayZ)
 
     property var _memberRefs: ({})
 
@@ -562,7 +585,9 @@ PluginComponent {
     // ── Horizontal bar pill ──────────────────────────────────────────────────
     horizontalBarPill: Component {
         Item {
-            implicitWidth: hRow.width
+            // In overlay mode keep the bar footprint at the collapsed (toggle) size
+            // so expanding doesn't push neighbours; members overflow and paint over.
+            implicitWidth: root.overlayExpand ? hToggle.width : hRow.width
             implicitHeight: hRow.height
 
             // Solid backing shown while expanded so the group stays readable when
@@ -574,6 +599,8 @@ PluginComponent {
                 color: Theme.surfaceContainerHigh
                 opacity: root.expanded ? 1 : 0
                 visible: opacity > 0
+                border.width: root.showExpandedBorder ? 1 : 0
+                border.color: Theme.outlineVariant
                 Behavior on opacity { NumberAnimation { duration: Theme.shortDuration } }
             }
 
@@ -581,6 +608,11 @@ PluginComponent {
                 id: hRow
                 spacing: Theme.spacingXS
                 layoutDirection: root.hLeft ? Qt.RightToLeft : Qt.LeftToRight
+                // Pin the toggle end to the collapsed footprint so it stays put while
+                // members overflow. Expand-left pins right, expand-right pins left.
+                anchors.left: (root.overlayExpand && root.hLeft) ? undefined : parent.left
+                anchors.right: (root.overlayExpand && root.hLeft) ? parent.right : undefined
+                anchors.verticalCenter: parent.verticalCenter
 
                 HoverHandler { onHoveredChanged: { root.hovered = hovered; if (hovered) root._recomputeHDir(hToggle) } }
 
@@ -797,7 +829,9 @@ PluginComponent {
     verticalBarPill: Component {
         Item {
             implicitWidth: vCol.width
-            implicitHeight: vCol.height
+            // In overlay mode keep the bar footprint at the collapsed (toggle) size
+            // so expanding doesn't push neighbours; members overflow and paint over.
+            implicitHeight: root.overlayExpand ? vToggle.height : vCol.height
 
             // Solid backing shown while expanded so the group stays readable when
             // its members overlap an adjacent bar section.
@@ -807,12 +841,19 @@ PluginComponent {
                 color: Theme.surfaceContainerHigh
                 opacity: root.expanded ? 1 : 0
                 visible: opacity > 0
+                border.width: root.showExpandedBorder ? 1 : 0
+                border.color: Theme.outlineVariant
                 Behavior on opacity { NumberAnimation { duration: Theme.shortDuration } }
             }
 
             Column {
                 id: vCol
                 spacing: Theme.spacingXS
+                // Pin the toggle end to the collapsed footprint so it stays put while
+                // members overflow. Expand-up pins bottom, expand-down pins top.
+                anchors.top: (root.overlayExpand && root.vUp) ? undefined : parent.top
+                anchors.bottom: (root.overlayExpand && root.vUp) ? parent.bottom : undefined
+                anchors.horizontalCenter: parent.horizontalCenter
 
                 HoverHandler { onHoveredChanged: { root.hovered = hovered; if (hovered) root._recomputeVDir(vToggle) } }
 
