@@ -244,6 +244,7 @@ PluginSettings {
             .filter(p => p.id !== "widgetGroup"
                       && (p.type === "widget" || (pluginService.pluginWidgetComponents && pluginService.pluginWidgetComponents[p.id])))
             .map(p => ({ id: p.id, name: p.name, icon: p.icon || "extension" })))
+            .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" }))
     }
     readonly property var availableTargetNames: availableTargets.map(p => p.name)
 
@@ -1054,6 +1055,7 @@ PluginSettings {
                     id: memberPicker
                     width: parent.width - addMemberBtn.width - (cancelMemberBtn.visible ? cancelMemberBtn.width + Theme.spacingM : 0) - Theme.spacingM
                     emptyText: "Select a widget plugin…"
+                    enableFuzzySearch: true
                     options: root.availableTargetNames
                     onValueChanged: (value) => {
                         const idx = root.availableTargetNames.indexOf(value)
